@@ -1,0 +1,30 @@
+# Spacefile Docs: https://go.deta.dev/docs/spacefile/v0
+v: 0
+micros:
+  # - name: frontend
+  #   src: frontend
+  #   engine: static
+  #   serve: dist/
+  #   primary: true
+  #   # dev: npm run dev
+  #   public_routes:
+  #     - "/favoritos/"
+  #     - "/quiniela/"
+  - name: backend
+    src: backend
+    path: api
+    engine: python3.9
+    dev: .venv/bin/uvicorn main:app --reload
+    presets:
+      env:
+        - name: BOT_TOKEN
+          description: Telegram BOT Token
+    public_routes:
+      - "/webhook"
+      # - "/quinieladb"
+    actions:
+      - id: "actualizartablas"
+        name: "Actualizar Tablas"
+        description: "Actualiza la tabla de pilotos y la de resultados"
+        trigger: "schedule"
+        default_interval: "0/5 * * * *"

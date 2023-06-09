@@ -1,0 +1,8 @@
+python-telegram-bot
+fastapi
+Pillow
+prettytable
+deta
+pytz
+requests
+beautifulsoup4
