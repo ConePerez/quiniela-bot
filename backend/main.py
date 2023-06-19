@@ -262,7 +262,7 @@ async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     respuesta = "*Carrera:* " + proxima_nombre
     orden_horarios = ['p1', 'p2', 'p3', 'q', 'r']
     if('s' in proxima_Carrera.items[0]):
-        orden_horarios = ['p1', 'q', 'p2', 's', 'r']
+        orden_horarios = ['p1', 'q', 'ss', 's', 'r']
     for sesion in orden_horarios:
         horario_sesion = datetime.fromisoformat(proxima_Carrera.items[0][sesion]['hora_empiezo'])
         horario_sesion = horario_sesion.astimezone(pytz.timezone('America/Mexico_City'))
