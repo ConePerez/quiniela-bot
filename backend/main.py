@@ -899,7 +899,7 @@ async def webhook_handler(req: Request):
     controles = dbConfiguracion.get('controles')
     data = await req.json()
     async with application:
-        await application.bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats)  
+        # await application.bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats)  
         await application.bot.set_my_commands(
             [
                 BotCommand("start", "empezar el bot"),
