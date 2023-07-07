@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from operator import itemgetter
 from io import BytesIO
 from telegram import __version__ as TG_VER
+from collections import Counter
 
 try:
     from telegram import __version_info__
@@ -35,6 +36,7 @@ from telegram import (
     BotCommandScopeAllGroupChats,
     BotCommandScopeChat,
     BotCommandScopeAllPrivateChats,
+    BotCommandScopeDefault,
 )
 from telegram.ext import (
     Application,
@@ -76,7 +78,28 @@ dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'd
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre','dicembre']
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
 
+def crear_tabla_puntos(obj_carrera):
+    tabla_puntos_piloto = PrettyTable()
+    tabla_puntos_piloto.title = obj_carrera['Nombre']
+    tabla_puntos_piloto.field_names = ["Pos", "Nombre", "Equipo", "Puntos", "Intervalo"]
+    tabla_puntos_piloto.sortby = "Pos"
+    resultado_pilotos = dbPuntosPilotos.get(obj_carrera['key'])
+    detalles_piloto = dbPilotos.get('2023')['Lista']
+    for numero, resultado in resultado_pilotos['Pilotos'].items():
+        tabla_puntos_piloto.add_row([resultado['posicion'], detalles_piloto[numero]['Nombre'] + ' ' + detalles_piloto[numero]['Apellido'], detalles_piloto[numero]['Equipo'], resultado['puntos'], resultado['intervalo']])
+    im = Image.new("RGB", (200, 200), "white")
+    dibujo = ImageDraw.Draw(im)
+    letra = ImageFont.truetype("Menlo.ttc", 15)
+    tablapilotostamano = dibujo.multiline_textbbox([0,0],str(tabla_puntos_piloto),font=letra)
+    im = im.resize((tablapilotostamano[2] + 20, tablapilotostamano[3] + 40))
+    dibujo = ImageDraw.Draw(im)
+    dibujo.text((10, 10), str(tabla_puntos_piloto), font=letra, fill="black")
+    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
+    dibujo.text((20, tablapilotostamano[3] + 20), "Resultados tomados de la pagina oficial de Formula 1", font=letraabajo, fill="black")
+    return im, obj_carrera['Nombre']
+
 def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
+    """Crear la tabla de las quinielas en una imagen."""
     carrera_nombre = carrera_en_curso['Nombre']
     carrera_clave = carrera_en_curso['key']
     tablaquiniela = PrettyTable()
@@ -85,15 +108,28 @@ def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     tablaquiniela.sortby = "Fecha/hora"
     dbquiniela = deta.Base("Quiniela")
     datosquiniela = dbquiniela.fetch({'Carrera':carrera_clave})
-    filas = datosquiniela.items            
+    filas = datosquiniela.items    
+    datos_posiciones = {'P1': [], 'P2': [], 'P3': [], 'P4': [], 'P5': [], 'P6': [], 'P7': []}        
     for index in range(datosquiniela.count):
         fila = filas[index]
         listaquiniela = fila["Lista"].split(",")
+        for pos, piloto in enumerate(listaquiniela):
+            datos_posiciones['P' + str(pos + 1)].append(piloto)
         if(enmascarada):
             listaquiniela = ["XXX"] * len(listaquiniela)
         fechahoraoriginal = datetime.fromisoformat(fila["FechaHora"])
         fechahoragdl = fechahoraoriginal.astimezone(pytz.timezone('America/Mexico_City'))
         tablaquiniela.add_row([fechahoragdl.strftime('%Y-%m-%d %H:%M:%S'), fila["Nombre"], listaquiniela[0], listaquiniela[1], listaquiniela[2], listaquiniela[3], listaquiniela[4], listaquiniela[5], listaquiniela[6]])
+    texto_estadisticas = ''
+    if not enmascarada:
+        for pos, datos in datos_posiciones.items():
+            total = len(datos)
+            contador = Counter(datos)
+            texto_estadisticas = texto_estadisticas + pos
+            contador = dict(sorted(contador.items(), key=lambda item: item[1], reverse=True))
+            for piloto, repeticion in contador.items():
+                texto_estadisticas = texto_estadisticas + ' ' + piloto + ' ' + str(100 * repeticion/total ) + '%'
+            texto_estadisticas = texto_estadisticas + '\n'
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
     letra = ImageFont.truetype("Menlo.ttc", 15)
@@ -103,7 +139,7 @@ def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     dibujo.text((10, 10), str(tablaquiniela), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
-    return im, carrera_nombre
+    return im, carrera_nombre, texto_estadisticas
 
 def crear_tabla_general():
     tablaresultados = PrettyTable()
@@ -113,7 +149,7 @@ def crear_tabla_general():
     tablaresultados.reversesort = True
 
     resultados_historicos = dbHistorico.fetch()
-    total_rondas = dbCarreras.fetch({'Estado':'ARCHIVADA'}).count
+    total_rondas = dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}]).count
     for usuario in resultados_historicos.items:
         normales = 0
         extras = 0
@@ -137,7 +173,7 @@ def crear_tabla_general():
     return im, total_rondas
 
 def crear_tabla_resultados():
-    carreras = dbCarreras.fetch({'Estado':'ARCHIVADA'})
+    carreras = dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
     maximo_horario = datetime.fromisoformat('2023-01-01T00:00:00.000+00:00')
     ultima_carrera_archivada = ''
     for carrera in carreras.items:
@@ -195,7 +231,7 @@ def crear_tabla_resultados():
     return im, texto_ganador
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Inform user about what this bot can do"""
+    """Informar al usuario que es lo que puede hacer"""
     print("entro start", update)
     texto =  "Bienvenido a la quiniela de F1 usa /quiniela para seleccionar a los pilotos del 1-7, /mipago para subir un comprobante de pago y /help para ver la ayuda. En cualquier momento puedes usar /cancelar para cancelar cualquier comando."
     await update.message.reply_text(
@@ -205,7 +241,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Display a help message"""
+    """Comando para desplegar la tabla de pagos"""
     carreras = dbCarreras.fetch()
     total_carreras = str(carreras.count)
     configuracion = dbConfiguracion.get('controles')
@@ -243,7 +279,7 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Display a help message"""
+    """Comando para desplegar la informacion de la siguiente carrera"""
     proxima_Carrera = dbCarreras.fetch([{'Estado':'IDLE'},{'Estado':'EN-CURSO'}])
     if(proxima_Carrera.count == 0):
         await update.message.replay_text(
@@ -455,11 +491,11 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if(ahora > horario_qualy):
             enmascarar = False
             mensaje = "Quinielas para ronda: "
-        im, carrera_nombre = crear_tabla_quinielas(carreras.items[0], enmascarar)
+        im, carrera_nombre, texto_estadisticas = crear_tabla_quinielas(carreras.items[0], enmascarar)
         with BytesIO() as tablaquinielaimagen:    
             im.save(tablaquinielaimagen, "png")
             tablaquinielaimagen.seek(0)
-            await update.message.reply_photo(tablaquinielaimagen, caption= mensaje + carrera_nombre)
+            await update.message.reply_photo(tablaquinielaimagen, caption= mensaje + carrera_nombre + '\n' + texto_estadisticas)
         return ConversationHandler.END
     await update.message.reply_text(
         'Aun no pasa un dia despues de la ultima carrera, no hay quinielas por mostrar.'
@@ -514,7 +550,6 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
         for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
             keyboard[len(keyboard) - 1].append('')
-    print(keyboard)
     reply_markup = InlineKeyboardMarkup(keyboard)
     nombre_carrera = carrera_quiniela.items[0]['Nombre']
     await update.message.reply_text("Usando los botones de abajo, ve escogiendo los pilotos del P1 a P7 para la carrera: " + nombre_carrera, reply_markup=reply_markup)
@@ -548,7 +583,6 @@ async def elegir_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
         for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
             keyboard[len(keyboard) - 1].append('')
-    print(keyboard)
     cuenta_pilotos = len(context.user_data['Lista'])
     if cuenta_pilotos > 0:
         keyboard.append([
@@ -631,11 +665,16 @@ async def actualizar_tablas():
     hora_actual = hora_actual.astimezone()
     hora_actual_utc = hora_actual.astimezone(utc)
 
+    print('hora actual: ', hora_actual_utc.isoformat())
+
     carrera_no_enviada = dbCarreras.fetch([{'Estado':'NO_ENVIADA'}])
     if carrera_no_enviada.count > 0:
-        dbCarreras.update(updates={'Estado':'ARCHIVADA'}, key=carrera_no_enviada.items[0]['key'])
+        archivo_log = documentos.get('Log_' + carrera_no_enviada.items[0]['key'] + '.txt')
+        contenido_anterior = archivo_log.read()
+        contenido_nuevo = ''
 
         print("imprimir tabla resultados")
+        contenido_nuevo += hora_actual_utc.isoformat() + ' Imprimir Tabla de Resultados\n'
         im, texto = crear_tabla_resultados()
         with BytesIO() as tablaresutados_imagen:    
             im.save(tablaresutados_imagen, "png")
@@ -645,8 +684,22 @@ async def actualizar_tablas():
                 photo=tablaresutados_imagen, 
                 caption=texto
                 )
-
+            
+        print("imprimir tabla de resultados carrera")
+        contenido_nuevo += hora_actual_utc.isoformat() + ' Imprimir Tabla Resultados Pilotos\n'
+        im, carrera = crear_tabla_puntos(carrera_no_enviada.items[0])
+        texto = 'Resultados de la carrera: ' + carrera
+        with BytesIO() as tabla_puntos_imagen:    
+            im.save(tabla_puntos_imagen, "png")
+            tabla_puntos_imagen.seek(0)
+            await application.bot.send_photo(
+                chat_id= float(controles['grupo']),
+                photo=tabla_puntos_imagen, 
+                caption=texto
+                )
+            
         print("imprimir tabla general")
+        contenido_nuevo += hora_actual_utc.isoformat() + ' Imprimir Tabla General\n'
         im, total_rondas = crear_tabla_general()
         texto = "Total de rondas incluidas: " + str(total_rondas)
         with BytesIO() as tablageneral_imagen:    
@@ -657,6 +710,8 @@ async def actualizar_tablas():
                 photo=tablageneral_imagen, 
                 caption=texto
                 )
+        documentos.put('Log_' + carrera_no_enviada.items[0]['key'] + '.txt', contenido_anterior + bytes(contenido_nuevo, 'utf-8'))
+        dbCarreras.update(updates={'Estado':'ARCHIVADA'}, key=carrera_no_enviada.items[0]['key'])
         
     encurso_siguiente_Carrera = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     if(encurso_siguiente_Carrera.count == 0):
@@ -689,22 +744,36 @@ async def actualizar_tablas():
                     'hora_termino': session_row['endTime'] + session_row['gmtOffset'],
                 }
             dbCarreras.put(carrera_dict)
+            archivo_log = documentos.put('Log_' + carrera_codigo + '.txt', hora_actual_utc.isoformat() + ' Empiezo log\n')
     else:
+        archivo_log = documentos.get('Log_' + encurso_siguiente_Carrera.items[0]['key'] + '.txt')
+        contenido_anterior = archivo_log.read()
+        contenido_nuevo = ''
         estado_Carrera = encurso_siguiente_Carrera.items[0]['Estado']
         if(estado_Carrera == 'IDLE'):
             horaempiezo_Carrera = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Empiezo'])
             horaempiezo_Carrera_utc = horaempiezo_Carrera.astimezone(utc)
+            contenido_nuevo += hora_actual_utc.isoformat() + ' Carrera en IDLE con empiezo el ' + horaempiezo_Carrera_utc.isoformat() + '\n'
             if(hora_actual_utc > horaempiezo_Carrera_utc):
                 carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
                 dbCarreras.update(updates={'Estado':'EN-CURSO'}, key=carrera_codigo)
+                contenido_nuevo += hora_actual_utc.isoformat() + ' Cambio a EN-CURSO\n'
         else:
+            horario_termino = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino'])
+            horario_termino_utc = horario_termino.astimezone(utc)
+
             horario_q_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['q']['hora_empiezo'])
             horario_q_sesion_utc = horario_q_sesion.astimezone(utc)
             estado_qualy = encurso_siguiente_Carrera.items[0]['q']['estado']
+
+            print('hora qualy: ', horario_q_sesion_utc.isoformat())
+            contenido_nuevo += hora_actual_utc.isoformat() + ' El horario de la qualy es ' + horario_q_sesion_utc.isoformat() + '\n'
+            contenido_nuevo += hora_actual_utc.isoformat() + ' El estado de la qualy es ' + estado_qualy + '\n'
             if hora_actual_utc >= horario_q_sesion_utc and estado_qualy == 'upcoming':
                 #mandar tabla quinielas
-                print('entro a crear tabla quiniela')
-                im, carrera_nombre = crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
+                print('entro a crear tabla quinielas')
+                contenido_nuevo += hora_actual_utc.isoformat() + ' Crear tabla de las quinielas\n'
+                im, carrera_nombre, texto_estadisticas = crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
                 texto = "Quinielas para la carrera " + encurso_siguiente_Carrera.items[0]['Nombre']
                 with BytesIO() as tablaquinielaimagen:    
                     im.save(tablaquinielaimagen, "png")
@@ -712,12 +781,13 @@ async def actualizar_tablas():
                     await application.bot.send_photo(
                         chat_id= float(controles['grupo']),
                         photo=tablaquinielaimagen, 
-                        caption=texto
+                        caption=texto + '\n' + texto_estadisticas
                         )
                 carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
                 cambiar_estado_qualy = encurso_siguiente_Carrera.items[0]['q']
                 cambiar_estado_qualy['estado'] = 'EMPEZADA'
                 dbCarreras.update(updates={'q':cambiar_estado_qualy}, key=carrera_codigo)
+                contenido_nuevo += hora_actual_utc.isoformat() + ' Cambiar estado de la qualy a EMPEZADA\n'
             revisar_Pilotos = dbPilotos.fetch({'Carrera':encurso_siguiente_Carrera.items[0]['key']})
             print('revisar_pilotos', revisar_Pilotos.count)
             if(revisar_Pilotos.count == 0):
@@ -762,13 +832,12 @@ async def actualizar_tablas():
                     response = requests.get(url=urlevent_tracker, headers=headerapi)
                     response.encoding = 'utf-8-sig'
                     response_dict = response.json()
+                    
                     if('sessionLinkSets' in response_dict):
                         index_sesion = len(response_dict['sessionLinkSets']['replayLinks']) - 1
                         sesion_carrera = response_dict['sessionLinkSets']['replayLinks'][index_sesion]['session']
                         urllivetiming = response_dict['sessionLinkSets']['replayLinks'][index_sesion]['url']
-                        links = []
-                        if('links' in response_dict and sesion_carrera == 'r'):
-                            links = response_dict['links']
+                        
                         driverslist = 'DriverList.json'
                         response = requests.get(url=urllivetiming + driverslist)
                         response.encoding = 'utf-8-sig'
@@ -789,85 +858,97 @@ async def actualizar_tablas():
                                 }
                                 print('racingnumer', response_dict[id]['RacingNumber'])
                                 dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
-                        if(sesion_carrera == 'r'):
-                            print('hacer tabla resultados')
-                            url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
-                            if(not(url_results_index is None)):
-                                url_results = links[url_results_index]['url']
-                                soup = BeautifulSoup(requests.get(url_results).text)
-                                table = soup.find('table')
-                                header = []
-                                rows = []
-                                for i, row in enumerate(table.find_all('tr')):
-                                    if i == 0:
-                                        header = [el.text.strip() for el in row.find_all('th')]
-                                    else:
-                                        rows.append([el.text.strip() for el in row.find_all('td')])
-                                posiciones_dict = {}
-                                for row in rows:
-                                    if(row[1].isnumeric()):
-                                        posicion = int(row[1])
-                                        if(posicion < 11):
-                                            posiciones_dict[row[2]] = {
-                                                'posicion': posicion, 
-                                                'intervalo': row[6],
-                                                'puntos': int(row[7])
-                                                }
-                                datosquiniela = dbquiniela.fetch()
-                                quinielas = datosquiniela.items
-                                dbPuntosPilotos.put({'key': encurso_siguiente_Carrera.items[0]['key'], 'Pilotos':posiciones_dict})
-                                for i_quiniela in range(len(quinielas)):
-                                    quiniela = quinielas[i_quiniela]
-                                    historico = dbHistorico.get(quiniela['key'])
-                                    if historico is None:
-                                        dbHistorico.put({
-                                            'key': quiniela['key'],
-                                            'Nombre': quiniela['Nombre'],
-                                            'Quinielas': {},
-                                            'Resultados': {}, 
-                                        })
-                                        historico = dbHistorico.get(quiniela['key'])
-                                    historico_quinielas = historico['Quinielas']
-                                    historico_quinielas[encurso_siguiente_Carrera.items[0]['key']] = quiniela
-                                    historico_resultados = historico['Resultados']
-                                    listaquiniela = quiniela['Lista'].split(',')
-                                    if quiniela['Carrera'] != encurso_siguiente_Carrera.items[0]['key']:
-                                        resultados = {'normales':0, 'extras':0, 'penalizaciones':-5}
-                                    else:
-                                        resultados = {'normales':0, 'extras':0, 'penalizaciones':0}
-                                    pagosusuarios = dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},{'usuario':quiniela['key'], 'estado':'confirmado'} ])
-                                    rondas_pagadas = 0
-                                    rondas_confirmadas = 0
-                                    for pagousuario in pagosusuarios.items:
-                                        rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
-                                        if pagousuario['estado'] == 'confirmado':
-                                            rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
-                                    if rondas_pagadas < int(encurso_siguiente_Carrera.items[0]['Ronda']):
-                                        resultados['penalizaciones'] = resultados['penalizaciones'] - 5
-                                    # se termino revisar pagos
-                                    for i_lista in range(len(listaquiniela)):
-                                        piloto = listaquiniela[i_lista]
-                                        piloto_fetch = dbPilotos.get('2023')
-                                        numero_piloto = ''
-                                        for n in piloto_fetch['Lista']:
-                                            if(piloto == piloto_fetch['Lista'][n]['codigo']):
-                                                numero_piloto = n
-                                        if( numero_piloto in posiciones_dict):
-                                            resultados['normales'] = resultados['normales'] + posiciones_dict[numero_piloto]['puntos']
-                                            if(i_lista + 1 == posiciones_dict[numero_piloto]['posicion']):
-                                                resultados['extras'] = resultados['extras'] + 2
-                                    historico_resultados[encurso_siguiente_Carrera.items[0]['key']] = resultados
-                                    dbHistorico.update(updates={ 
-                                        'Quinielas': historico_quinielas, 
-                                        'Resultados': historico_resultados, 
-                                        }, key=quiniela['key'])
-                                
-                                dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
-                                
-                                await application.bot.send_message(
-                                    chat_id= float(controles['grupo']), 
-                                    text='prueba mensaje automatico'
-                                    )
+                        # if(sesion_carrera == 'r'):                            
+            contenido_nuevo += hora_actual_utc.isoformat() + ' Horario de termino de la carrera ' + horario_termino_utc.isoformat() + '\n'
+            if hora_actual_utc > horario_termino_utc:
+                response = requests.get(url=urlevent_tracker, headers=headerapi)
+                response.encoding = 'utf-8-sig'
+                response_dict = response.json()
+                contenido_nuevo += hora_actual_utc.isoformat() + ' Respuesta de la API ' + response_dict + '\n'
+                links = []
+                if('links' in response_dict):
+                    links = response_dict['links']                                
+                    url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
+                    if(not(url_results_index is None)):
+                        print('hacer tabla resultados')
+                        contenido_nuevo += hora_actual_utc.isoformat() + ' Leer pagina de la Formula 1\n'
+                        url_results = links[url_results_index]['url']
+                        soup = BeautifulSoup(requests.get(url_results).text)
+                        table = soup.find('table')
+                        # header = []
+                        rows = []
+                        for i, row in enumerate(table.find_all('tr')):
+                            if i == 0:
+                                header = [el.text.strip() for el in row.find_all('th')]
+                            else:
+                                rows.append([el.text.strip() for el in row.find_all('td')])
+                        posiciones_dict = {}
+                        for row in rows:
+                            if(row[1].isnumeric()):
+                                posicion = int(row[1])
+                                if(posicion < 11):
+                                    posiciones_dict[row[2]] = {
+                                        'posicion': posicion, 
+                                        'intervalo': row[6],
+                                        'puntos': int(row[7])
+                                        }
+                        datosquiniela = dbquiniela.fetch()
+                        quinielas = datosquiniela.items
+                        dbPuntosPilotos.put({'key': encurso_siguiente_Carrera.items[0]['key'], 'Pilotos':posiciones_dict})
+                        for i_quiniela in range(len(quinielas)):
+                            quiniela = quinielas[i_quiniela]
+                            historico = dbHistorico.get(quiniela['key'])
+                            if historico is None:
+                                dbHistorico.put({
+                                    'key': quiniela['key'],
+                                    'Nombre': quiniela['Nombre'],
+                                    'Quinielas': {},
+                                    'Resultados': {}, 
+                                })
+                                historico = dbHistorico.get(quiniela['key'])
+                            historico_quinielas = historico['Quinielas']
+                            historico_quinielas[encurso_siguiente_Carrera.items[0]['key']] = quiniela
+                            historico_resultados = historico['Resultados']
+                            listaquiniela = quiniela['Lista'].split(',')
+                            if quiniela['Carrera'] != encurso_siguiente_Carrera.items[0]['key']:
+                                resultados = {'normales':0, 'extras':0, 'penalizaciones':-5}
+                            else:
+                                resultados = {'normales':0, 'extras':0, 'penalizaciones':0}
+                            pagosusuarios = dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},{'usuario':quiniela['key'], 'estado':'confirmado'} ])
+                            rondas_pagadas = 0
+                            rondas_confirmadas = 0
+                            for pagousuario in pagosusuarios.items:
+                                rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
+                                if pagousuario['estado'] == 'confirmado':
+                                    rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
+                            if rondas_pagadas < int(encurso_siguiente_Carrera.items[0]['Ronda']):
+                                resultados['penalizaciones'] = resultados['penalizaciones'] - 5
+                            # se termino revisar pagos
+                            for i_lista in range(len(listaquiniela)):
+                                piloto = listaquiniela[i_lista]
+                                piloto_fetch = dbPilotos.get('2023')
+                                numero_piloto = ''
+                                for n in piloto_fetch['Lista']:
+                                    if(piloto == piloto_fetch['Lista'][n]['codigo']):
+                                        numero_piloto = n
+                                if( numero_piloto in posiciones_dict):
+                                    resultados['normales'] = resultados['normales'] + posiciones_dict[numero_piloto]['puntos']
+                                    if(i_lista + 1 == posiciones_dict[numero_piloto]['posicion']):
+                                        resultados['extras'] = resultados['extras'] + 2
+                            historico_resultados[encurso_siguiente_Carrera.items[0]['key']] = resultados
+                            contenido_nuevo += hora_actual_utc.isoformat() + ' Actualizar quinielas y resultados en la tabla historicos\n'
+                            dbHistorico.update(updates={ 
+                                'Quinielas': historico_quinielas, 
+                                'Resultados': historico_resultados, 
+                                }, key=quiniela['key'])
+                        
+                        dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
+                        contenido_nuevo += hora_actual_utc.isoformat() + ' Cambiar estado a NO_ENVIADA\n'
+                        await application.bot.send_message(
+                            chat_id= float(controles['grupo']), 
+                            text='prueba mensaje automatico'
+                            )
+        documentos.put('Log_' + encurso_siguiente_Carrera.items[0]['key'] + '.txt', contenido_anterior + bytes(contenido_nuevo, 'utf-8'))
     pagos_por_enviar = dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
     if pagos_por_enviar.count > 0:
         for pago in pagos_por_enviar.items:
@@ -887,7 +968,8 @@ async def webhook_handler(req: Request):
     controles = dbConfiguracion.get('controles')
     data = await req.json()
     async with application:
-        # await application.bot.delete_my_commands(scope=BotCommandScopeAllPrivateChats)  
+        await application.bot.delete_my_commands(scope=BotCommandScopeChat(5895888783))  
+        
         await application.bot.set_my_commands(
             [
                 BotCommand("start", "empezar el bot"),
@@ -895,7 +977,8 @@ async def webhook_handler(req: Request):
                 BotCommand("mipago", "mandar comprobante pago"),
                 BotCommand("help", "mostrar reglas quiniela"),
                 BotCommand("cancelar", "cancelar una accion"),
-            ]
+            ],
+            scope=BotCommandScopeAllPrivateChats()
         )
         await application.bot.set_my_commands(
             [
