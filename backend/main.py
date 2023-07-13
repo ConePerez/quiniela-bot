@@ -37,6 +37,7 @@ from telegram import (
     BotCommandScopeChat,
     BotCommandScopeAllPrivateChats,
     BotCommandScopeDefault,
+    Bot,
 )
 from telegram.ext import (
     Application,
@@ -653,7 +654,7 @@ def get_application():
 application = get_application()
 
 async def actualizar_tablas():
-
+    bot_quiniela = Bot(BotToken)
     F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
     urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
     headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
@@ -671,6 +672,7 @@ async def actualizar_tablas():
     if carrera_no_enviada.count > 0:
         archivo_log = documentos.get('Log_' + carrera_no_enviada.items[0]['key'] + '.txt')
         contenido_anterior = archivo_log.read()
+        archivo_log.close()
         contenido_nuevo = ''
 
         print("imprimir tabla resultados")
@@ -679,7 +681,7 @@ async def actualizar_tablas():
         with BytesIO() as tablaresutados_imagen:    
             im.save(tablaresutados_imagen, "png")
             tablaresutados_imagen.seek(0)
-            await application.bot.send_photo(
+            await bot_quiniela.send_photo(
                 chat_id= float(controles['grupo']),
                 photo=tablaresutados_imagen, 
                 caption=texto
@@ -692,7 +694,7 @@ async def actualizar_tablas():
         with BytesIO() as tabla_puntos_imagen:    
             im.save(tabla_puntos_imagen, "png")
             tabla_puntos_imagen.seek(0)
-            await application.bot.send_photo(
+            await bot_quiniela.send_photo(
                 chat_id= float(controles['grupo']),
                 photo=tabla_puntos_imagen, 
                 caption=texto
@@ -705,7 +707,7 @@ async def actualizar_tablas():
         with BytesIO() as tablageneral_imagen:    
             im.save(tablageneral_imagen, "png")
             tablageneral_imagen.seek(0)
-            await application.bot.send_photo(
+            await bot_quiniela.send_photo(
                 chat_id= float(controles['grupo']),
                 photo=tablageneral_imagen, 
                 caption=texto
@@ -748,6 +750,7 @@ async def actualizar_tablas():
     else:
         archivo_log = documentos.get('Log_' + encurso_siguiente_Carrera.items[0]['key'] + '.txt')
         contenido_anterior = archivo_log.read()
+        archivo_log.close()
         contenido_nuevo = ''
         estado_Carrera = encurso_siguiente_Carrera.items[0]['Estado']
         if(estado_Carrera == 'IDLE'):
@@ -769,6 +772,7 @@ async def actualizar_tablas():
             print('hora qualy: ', horario_q_sesion_utc.isoformat())
             contenido_nuevo += hora_actual_utc.isoformat() + ' El horario de la qualy es ' + horario_q_sesion_utc.isoformat() + '\n'
             contenido_nuevo += hora_actual_utc.isoformat() + ' El estado de la qualy es ' + estado_qualy + '\n'
+            
             if hora_actual_utc >= horario_q_sesion_utc and estado_qualy == 'upcoming':
                 #mandar tabla quinielas
                 print('entro a crear tabla quinielas')
@@ -778,7 +782,7 @@ async def actualizar_tablas():
                 with BytesIO() as tablaquinielaimagen:    
                     im.save(tablaquinielaimagen, "png")
                     tablaquinielaimagen.seek(0)
-                    await application.bot.send_photo(
+                    await bot_quiniela.send_photo(
                         chat_id= float(controles['grupo']),
                         photo=tablaquinielaimagen, 
                         caption=texto + '\n' + texto_estadisticas
@@ -861,10 +865,11 @@ async def actualizar_tablas():
                         # if(sesion_carrera == 'r'):                            
             contenido_nuevo += hora_actual_utc.isoformat() + ' Horario de termino de la carrera ' + horario_termino_utc.isoformat() + '\n'
             if hora_actual_utc > horario_termino_utc:
+                contenido_nuevo += hora_actual_utc.isoformat() + ' Leer API de event tracker' + urlevent_tracker + '\n'
                 response = requests.get(url=urlevent_tracker, headers=headerapi)
                 response.encoding = 'utf-8-sig'
                 response_dict = response.json()
-                contenido_nuevo += hora_actual_utc.isoformat() + ' Respuesta de la API ' + response_dict + '\n'
+                # contenido_nuevo += hora_actual_utc.isoformat() + ' Respuesta de la API ' + str(response_dict) + '\n'
                 links = []
                 if('links' in response_dict):
                     links = response_dict['links']                                
@@ -944,16 +949,17 @@ async def actualizar_tablas():
                         
                         dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
                         contenido_nuevo += hora_actual_utc.isoformat() + ' Cambiar estado a NO_ENVIADA\n'
-                        await application.bot.send_message(
+                        await bot_quiniela.send_message(
                             chat_id= float(controles['grupo']), 
-                            text='prueba mensaje automatico'
+                            text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
                             )
+                        documentos.put('Log_' + encurso_siguiente_Carrera.items[0]['key'] + '.txt', contenido_anterior + bytes(contenido_nuevo, 'utf-8'))
         documentos.put('Log_' + encurso_siguiente_Carrera.items[0]['key'] + '.txt', contenido_anterior + bytes(contenido_nuevo, 'utf-8'))
     pagos_por_enviar = dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
     if pagos_por_enviar.count > 0:
         for pago in pagos_por_enviar.items:
             texto = 'Este pago ya fue ' + pago['estado']+ ' por el tesorero.'
-            await application.bot.send_message(
+            await bot_quiniela.send_message(
                 float(pago['usuario']), 
                 text=texto,
                 reply_to_message_id=pago['mensaje']
@@ -968,6 +974,7 @@ async def webhook_handler(req: Request):
     controles = dbConfiguracion.get('controles')
     data = await req.json()
     async with application:
+        
         await application.bot.delete_my_commands(scope=BotCommandScopeChat(5895888783))  
         
         await application.bot.set_my_commands(
@@ -1010,4 +1017,5 @@ async def actions(req: Request):
   data = await req.json()
   event = data['event']
   if event['id'] == 'actualizartablas':
+    logger.info("Entro a actualizar tablas")
     await actualizar_tablas()

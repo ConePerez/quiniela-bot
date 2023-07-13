@@ -14,7 +14,7 @@ micros:
     src: backend
     path: api
     engine: python3.9
-    dev: .venv/bin/uvicorn main:app --reload
+    dev: ./../.venv/bin/uvicorn main:app --reload
     presets:
       env:
         - name: BOT_TOKEN

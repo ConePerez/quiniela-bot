@@ -6,3 +6,4 @@ deta
 pytz
 requests
 beautifulsoup4
+uvicorn

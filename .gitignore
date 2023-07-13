@@ -1,3 +1,4 @@
 .space
 frontend
 backend/.venv
+.venv
