@@ -504,7 +504,9 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def general(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("entro a general")
     im, total_rondas = crear_tabla_general()
+    print("regreso de imprimir resultados, con total de rondas: ", str(total_rondas))
     with BytesIO() as tablaresutados_imagen:    
         im.save(tablaresutados_imagen, "png")
         tablaresutados_imagen.seek(0)
@@ -514,7 +516,9 @@ async def general(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Sends a picture"""
     # aggregar un if, si hay carrera en curso mandar mensaje de espera
+    print("Entro a resultados")
     im, texto = crear_tabla_resultados()
+    print("Regreso con este texto de resultados: ", texto)
     with BytesIO() as tablaresutados_imagen:    
         im.save(tablaresutados_imagen, "png")
         tablaresutados_imagen.seek(0)
@@ -526,6 +530,11 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     puntospilotos = dbPuntosPilotos.fetch()
     pilotoslista = dbPilotos.get('2023')['Lista']
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    if carrera_quiniela.count == 0:
+        await update.message.reply_text(
+                'Aun no tengo los datos para la siguiente carrera, espera un dia despues que termino la ultima carrera, para mandar la quiniela de la proxima.'
+                )
+        return ConversationHandler.END
     horario_qualy = datetime.fromisoformat(carrera_quiniela.items[0]['q']['hora_empiezo'])
     ahora = datetime.now()
     ahora = ahora.astimezone()
@@ -550,7 +559,8 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         cuenta_columnas = cuenta_columnas + 1
     if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
         for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
-            keyboard[len(keyboard) - 1].append('')
+            keyboard[len(keyboard) - 1].append(InlineKeyboardButton(' ', callback_data='NADA'))
+    print(str(keyboard))
     reply_markup = InlineKeyboardMarkup(keyboard)
     nombre_carrera = carrera_quiniela.items[0]['Nombre']
     await update.message.reply_text("Usando los botones de abajo, ve escogiendo los pilotos del P1 a P7 para la carrera: " + nombre_carrera, reply_markup=reply_markup)
@@ -560,9 +570,10 @@ async def elegir_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     query = update.callback_query
     await query.answer()
     cuenta_pilotos = len(context.user_data['Lista'])    
-    if query.data == 'ATRAS':
+    if query.data == 'ATRAS' or query.data == 'NADA':
         if cuenta_pilotos > 0:
-            codigo_eliminado = context.user_data['Lista'].pop()
+            if query.data == 'ATRASA':
+                codigo_eliminado = context.user_data['Lista'].pop()
     else:
         if cuenta_pilotos < 7:
             if not query.data in context.user_data['Lista']:
@@ -583,7 +594,7 @@ async def elegir_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         cuenta_columnas = cuenta_columnas + 1
     if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
         for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
-            keyboard[len(keyboard) - 1].append('')
+            keyboard[len(keyboard) - 1].append(InlineKeyboardButton(' ', callback_data='NADA'))
     cuenta_pilotos = len(context.user_data['Lista'])
     if cuenta_pilotos > 0:
         keyboard.append([
@@ -601,6 +612,7 @@ async def elegir_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def confirmar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    print(str(query))
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     user = query.from_user
     data = ",".join(context.user_data['Lista'])
@@ -610,48 +622,11 @@ async def confirmar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if(user.last_name is not None):
         apellido = ' ' + user.last_name
     dbquiniela.put({"Carrera": carrera_quiniela.items[0]['key'], "Lista": data, "FechaHora":now.isoformat(), "Nombre":user.first_name + apellido, "key": str(user.id)})
-    texto = "Tu lista se ha guardado en la base de datos. Quedo de la siguiente manera:\n"
+    texto = "Tu lista para la carrera " + carrera_quiniela.items[0]['Nombre'] + " se ha guardado en la base de datos. Quedo de la siguiente manera:\n"
     for index, codigo in enumerate(context.user_data['Lista']):
         texto = texto + 'P' + str(index + 1) + ' ' + codigo + '\n'
     await query.edit_message_text(text=texto)
     return ConversationHandler.END
-
-def get_application():
-    pilotoslista = dbPilotos.get('2023')['Lista']
-    filtropilotos = 'ATRAS'
-    for pilotonumer in pilotoslista:
-        filtropilotos = filtropilotos + '|' + pilotoslista[pilotonumer]['codigo']
-    filtropilotos = '^(' + filtropilotos + ')$'
-    application = Application.builder().token(BotToken).build()
-    conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("quiniela", inicio_pilotos), 
-            CommandHandler("start", start),
-            CommandHandler("help", help),
-            CommandHandler("quinielas", quinielas),
-            CommandHandler("general", general),
-            CommandHandler("resultados", resultados),
-            CommandHandler("cancelar", cancelar),
-            CommandHandler("proxima", proxima),
-            CommandHandler("mipago", mipago),
-            CommandHandler("pagos", pagos),
-            CommandHandler("revisarpagos", revisarpagos),
-            ],
-        states={
-            ELEGIR_PILOTOS:[CallbackQueryHandler(elegir_pilotos, pattern=filtropilotos), CallbackQueryHandler(confirmar_pilotos, pattern="^CONFIRMAR$")], 
-            MENU_AYUDA: [CallbackQueryHandler(reglas, pattern="^" + REGLAS + "$"), CallbackQueryHandler(ayuda, pattern="^" + AYUDA + "$")],
-            VALIDARPAGO: [MessageHandler(filters.Regex('^Si$'), validarpago), MessageHandler(filters.Regex('^No$'), finpagos)], 
-            SIGUIENTEPAGO: [MessageHandler(filters.Regex('^Si$'), pagovalidado), MessageHandler(filters.Regex('^No$'), pagorechazado)], 
-            FINPAGOS: [MessageHandler(filters.Regex('^No$'), finpagos)],
-            GUARDARCOMPROBANTE: [MessageHandler(filters.PHOTO, guardar_comprobante)], 
-            SUBIRCOMPROBANTE: [MessageHandler(filters.Regex('^(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|Todas)$'), subir_comprobante)],
-            },
-        fallbacks=[CommandHandler("cancelar", cancelar)],
-    )
-    application.add_handler(conv_handler)
-    return application
-
-application = get_application()
 
 async def actualizar_tablas():
     bot_quiniela = Bot(BotToken)
@@ -667,6 +642,7 @@ async def actualizar_tablas():
     hora_actual_utc = hora_actual.astimezone(utc)
 
     print('hora actual: ', hora_actual_utc.isoformat())
+    logger.info("Comenzo el proceso de actualizar tablas")
 
     carrera_no_enviada = dbCarreras.fetch([{'Estado':'NO_ENVIADA'}])
     if carrera_no_enviada.count > 0:
@@ -676,6 +652,7 @@ async def actualizar_tablas():
         contenido_nuevo = ''
 
         print("imprimir tabla resultados")
+        logger.info("Imprimir tabla de resultados")
         contenido_nuevo += hora_actual_utc.isoformat() + ' Imprimir Tabla de Resultados\n'
         im, texto = crear_tabla_resultados()
         with BytesIO() as tablaresutados_imagen:    
@@ -688,6 +665,7 @@ async def actualizar_tablas():
                 )
             
         print("imprimir tabla de resultados carrera")
+        logger.info("Imprimir tabla de resultados carrera")
         contenido_nuevo += hora_actual_utc.isoformat() + ' Imprimir Tabla Resultados Pilotos\n'
         im, carrera = crear_tabla_puntos(carrera_no_enviada.items[0])
         texto = 'Resultados de la carrera: ' + carrera
@@ -701,6 +679,7 @@ async def actualizar_tablas():
                 )
             
         print("imprimir tabla general")
+        logger.info("Imprimir tabla general")
         contenido_nuevo += hora_actual_utc.isoformat() + ' Imprimir Tabla General\n'
         im, total_rondas = crear_tabla_general()
         texto = "Total de rondas incluidas: " + str(total_rondas)
@@ -967,16 +946,51 @@ async def actualizar_tablas():
             dbPagos.update(updates={'enviado':True}, key=pago['key'])
     return
 
+def get_application():
+    pilotoslista = dbPilotos.get('2023')['Lista']
+    filtropilotos = 'ATRAS'
+    for pilotonumer in pilotoslista:
+        filtropilotos = filtropilotos + '|' + pilotoslista[pilotonumer]['codigo']
+    filtropilotos = '^(' + filtropilotos + ')$'
+    application = Application.builder().token(BotToken).build()
+    conv_handler = ConversationHandler(
+        entry_points=[
+            CommandHandler("quiniela", inicio_pilotos), 
+            CommandHandler("start", start),
+            CommandHandler("help", help),
+            CommandHandler("quinielas", quinielas),
+            CommandHandler("general", general),
+            CommandHandler("resultados", resultados),
+            CommandHandler("cancelar", cancelar),
+            CommandHandler("proxima", proxima),
+            CommandHandler("mipago", mipago),
+            CommandHandler("pagos", pagos),
+            CommandHandler("revisarpagos", revisarpagos),
+            ],
+        states={
+            ELEGIR_PILOTOS:[CallbackQueryHandler(elegir_pilotos, pattern=filtropilotos), CallbackQueryHandler(confirmar_pilotos, pattern="^CONFIRMAR$")], 
+            MENU_AYUDA: [CallbackQueryHandler(reglas, pattern="^" + REGLAS + "$"), CallbackQueryHandler(ayuda, pattern="^" + AYUDA + "$")],
+            VALIDARPAGO: [MessageHandler(filters.Regex('^Si$'), validarpago), MessageHandler(filters.Regex('^No$'), finpagos)], 
+            SIGUIENTEPAGO: [MessageHandler(filters.Regex('^Si$'), pagovalidado), MessageHandler(filters.Regex('^No$'), pagorechazado)], 
+            FINPAGOS: [MessageHandler(filters.Regex('^No$'), finpagos)],
+            GUARDARCOMPROBANTE: [MessageHandler(filters.PHOTO, guardar_comprobante)], 
+            SUBIRCOMPROBANTE: [MessageHandler(filters.Regex('^(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|Todas)$'), subir_comprobante)],
+            },
+        fallbacks=[CommandHandler("cancelar", cancelar)],
+    )
+    application.add_handler(conv_handler)
+
+    return application
+
+application = get_application()
+controles = dbConfiguracion.get('controles')
+
 app = FastAPI()
 
 @app.post("/webhook")
 async def webhook_handler(req: Request):
-    controles = dbConfiguracion.get('controles')
     data = await req.json()
-    async with application:
-        
-        await application.bot.delete_my_commands(scope=BotCommandScopeChat(5895888783))  
-        
+    async with application:            
         await application.bot.set_my_commands(
             [
                 BotCommand("start", "empezar el bot"),
