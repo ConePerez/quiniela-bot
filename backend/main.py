@@ -47,6 +47,7 @@ from telegram.ext import (
     ConversationHandler,
     filters,
     CallbackQueryHandler,
+    PicklePersistence,
 )
 
 # Enable logging
@@ -61,7 +62,7 @@ logger.addHandler(chandles)
 deta = Deta()
 BotToken = os.getenv("BOT_TOKEN")
 bot_hostname = os.getenv("DETA_SPACE_APP_HOSTNAME")
-QUINIELA, FAVORITOS, CONFIRMAR_PENALIZACION, SUBIRCOMPROBANTE, GUARDARCOMPROBANTE, VALIDARPAGO, SIGUIENTEPAGO, FINPAGOS, MENU_AYUDA, ELEGIR_PILOTOS, CONFIRMAR_PILOTOS = range(11)
+QUINIELA, FAVORITOS, CONFIRMAR_PENALIZACION, SUBIRCOMPROBANTE, GUARDARCOMPROBANTE, VALIDARPAGO, SIGUIENTEPAGO, FINPAGOS, MENU_AYUDA, GUARDAR_PILOTOS, CONFIRMAR_PILOTOS, P1, P2, P3, P4, P5, P6, P7 = range(18)
 REGLAS = 'reglas'
 AYUDA = 'ayuda'
 ultima_carrera = ''
@@ -312,6 +313,7 @@ async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels and ends the conversation."""
+    print('cancelar: ', str(update))
     user = update.message.from_user
     # dbprueba = deta.Base('simple_db')
     # dbprueba.put({'prueba':str(user)})
@@ -526,6 +528,7 @@ async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("inicio pilotos: ", str(update), str(context.user_data))
     context.user_data['Lista'] = []
     puntospilotos = dbPuntosPilotos.fetch()
     pilotoslista = dbPilotos.get('2023')['Lista']
@@ -547,7 +550,7 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         for piloto in carrera['Pilotos']:
             pilotoslista[piloto]['AcumuladoPuntos'] = pilotoslista[piloto]['AcumuladoPuntos'] + carrera['Pilotos'][piloto]['puntos']
     pilotoslista = sorted(pilotoslista.items(), key=lambda item: item[1]['AcumuladoPuntos'], reverse=True)
-    context.user_data['ListaPilotosOrdenada'] = pilotoslista
+    # context.user_data['ListaPilotosOrdenada'] = pilotoslista
     COLUMNAS = 5
     keyboard = []
     cuenta_columnas = COLUMNAS
@@ -560,60 +563,342 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
         for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
             keyboard[len(keyboard) - 1].append(InlineKeyboardButton(' ', callback_data='NADA'))
-    print(str(keyboard))
     reply_markup = InlineKeyboardMarkup(keyboard)
     nombre_carrera = carrera_quiniela.items[0]['Nombre']
     await update.message.reply_text("Usando los botones de abajo, ve escogiendo los pilotos del P1 a P7 para la carrera: " + nombre_carrera, reply_markup=reply_markup)
-    return ELEGIR_PILOTOS
+    return P1
 
-async def elegir_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-    cuenta_pilotos = len(context.user_data['Lista'])    
-    if query.data == 'ATRAS' or query.data == 'NADA':
-        if cuenta_pilotos > 0:
-            if query.data == 'ATRASA':
-                codigo_eliminado = context.user_data['Lista'].pop()
-    else:
-        if cuenta_pilotos < 7:
-            if not query.data in context.user_data['Lista']:
-                context.user_data['Lista'].append(query.data)
-    pilotoslista = context.user_data['ListaPilotosOrdenada']
-    COLUMNAS = 5
-    keyboard = []
-    cuenta_columnas = COLUMNAS
-    for pilotonumer in pilotoslista:
-        pos = ''
-        if COLUMNAS == cuenta_columnas:
-            keyboard.append([])
-            cuenta_columnas = 0
-        if pilotonumer[1]['codigo'] in context.user_data['Lista']:
-            p = context.user_data['Lista'].index(pilotonumer[1]['codigo']) + 1
-            pos = 'P' + str(p) + ' '
-        keyboard[len(keyboard) - 1].append(InlineKeyboardButton(pos + pilotonumer[1]['codigo'], callback_data=pilotonumer[1]['codigo']))
-        cuenta_columnas = cuenta_columnas + 1
-    if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
-        for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
-            keyboard[len(keyboard) - 1].append(InlineKeyboardButton(' ', callback_data='NADA'))
-    cuenta_pilotos = len(context.user_data['Lista'])
-    if cuenta_pilotos > 0:
-        keyboard.append([
-            InlineKeyboardButton("Atras", callback_data='ATRAS'),
-        ])
-    if cuenta_pilotos == 7:
-        keyboard.append([
-            InlineKeyboardButton("CONFIRMAR", callback_data='CONFIRMAR'),
-        ])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    texto = 'Asi va tu lista de piltos (de P1 a P7):\n' + ",".join(context.user_data['Lista'])
-    await query.edit_message_text(text=texto, reply_markup=reply_markup)
-    return ELEGIR_PILOTOS
-
-async def confirmar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-    print(str(query))
+async def p1(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
+    print("p1: ", str(update), str(context.user_data))
+    hay_boton_atras = False
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    query = update.callback_query
+    await query.answer()
+    if query.data == 'NADA':
+        return None
+    if query.data in context.user_data['Lista']:
+        return None
+    if query.data == 'ATRAS':
+        codigo_eliminado = context.user_data['Lista'].pop()
+    else:
+        context.user_data['Lista'].append(query.data)
+    teclado = []
+    for fila in update.effective_message.reply_markup.inline_keyboard:
+        teclado.append([])
+        if len(fila) == 5:
+            for boton in fila:
+                texto = boton.text
+                if len(texto) > 3:
+                    texto = boton.text[3:]
+                if texto in context.user_data['Lista']:
+                    posicion = str(context.user_data['Lista'].index(texto) + 1)
+                    texto = 'P' + posicion + ' ' + texto
+                teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
+    teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
+    reply_markup = InlineKeyboardMarkup(teclado)
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    await query.edit_message_text(text=texto, reply_markup=reply_markup)       
+    if query.data == 'ATRAS':
+        await query.edit_message_text(text='Vuelve a empezar con el comando /quiniela')
+        return ConversationHandler.END
+    return P2
+
+async def p2(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
+    print("p2: ", str(update), str(context.user_data))
+    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    query = update.callback_query
+    await query.answer()
+    if query.data == 'NADA':
+        return None
+    if query.data in context.user_data['Lista']:
+        return None
+    if query.data == 'ATRAS':
+        codigo_eliminado = context.user_data['Lista'].pop()
+    else:
+        context.user_data['Lista'].append(query.data)
+    teclado = []
+    for fila in update.effective_message.reply_markup.inline_keyboard:
+        teclado.append([])
+        if len(fila) == 5:
+            for boton in fila:
+                texto = boton.text
+                if len(texto) > 3 and not texto == 'ATRAS':
+                    texto = boton.text[3:]
+                if texto in context.user_data['Lista']:
+                    posicion = str(context.user_data['Lista'].index(texto) + 1)
+                    texto = 'P' + posicion + ' ' + texto
+                teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))    
+    teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
+    reply_markup = InlineKeyboardMarkup(teclado)
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    await query.edit_message_text(text=texto, reply_markup=reply_markup)       
+    if query.data == 'ATRAS':
+        return P1
+    return P3
+
+async def p3(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
+    print("p3: ", str(update), str(context.user_data))
+    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    query = update.callback_query
+    await query.answer()
+    if query.data == 'NADA':
+        return None
+    if query.data in context.user_data['Lista']:
+        return None
+    if query.data == 'ATRAS':
+        codigo_eliminado = context.user_data['Lista'].pop()
+    else:
+        context.user_data['Lista'].append(query.data)
+    teclado = []
+    for fila in update.effective_message.reply_markup.inline_keyboard:
+        teclado.append([])
+        if len(fila) == 5:
+            for boton in fila:
+                texto = boton.text
+                if len(texto) > 3:
+                    texto = boton.text[3:]
+                if texto in context.user_data['Lista']:
+                    posicion = str(context.user_data['Lista'].index(texto) + 1)
+                    texto = 'P' + posicion + ' ' + texto
+                teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))    
+    teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
+    reply_markup = InlineKeyboardMarkup(teclado)
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    await query.edit_message_text(text=texto, reply_markup=reply_markup)       
+    if query.data == 'ATRAS':
+        return P2
+    return P4
+
+async def p4(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
+    print("p4: ", str(update), str(context.user_data))
+    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    query = update.callback_query
+    await query.answer()
+    if query.data == 'NADA':
+        return None
+    if query.data in context.user_data['Lista']:
+        return None
+    if query.data == 'ATRAS':
+        codigo_eliminado = context.user_data['Lista'].pop()
+    else:
+        context.user_data['Lista'].append(query.data)
+    teclado = []
+    for fila in update.effective_message.reply_markup.inline_keyboard:
+        teclado.append([])
+        if len(fila) == 5:
+            for boton in fila:
+                texto = boton.text
+                if len(texto) > 3:
+                    texto = boton.text[3:]
+                if texto in context.user_data['Lista']:
+                    posicion = str(context.user_data['Lista'].index(texto) + 1)
+                    texto = 'P' + posicion + ' ' + texto
+                teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
+    teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
+    reply_markup = InlineKeyboardMarkup(teclado)
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    await query.edit_message_text(text=texto, reply_markup=reply_markup)       
+    if query.data == 'ATRAS':
+        return P3
+    return P5
+
+async def p5(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
+    print("p5: ", str(update), str(context.user_data))
+    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    query = update.callback_query
+    await query.answer()
+    if query.data == 'NADA':
+        return None
+    if query.data in context.user_data['Lista']:
+        return None
+    if query.data == 'ATRAS':
+        codigo_eliminado = context.user_data['Lista'].pop()
+    else:
+        context.user_data['Lista'].append(query.data)
+    teclado = []
+    for fila in update.effective_message.reply_markup.inline_keyboard:
+        teclado.append([])
+        if len(fila) == 5:
+            for boton in fila:
+                texto = boton.text
+                if len(texto) > 3:
+                    texto = boton.text[3:]
+                if texto in context.user_data['Lista']:
+                    posicion = str(context.user_data['Lista'].index(texto) + 1)
+                    texto = 'P' + posicion + ' ' + texto
+                teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
+    teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
+    reply_markup = InlineKeyboardMarkup(teclado)
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    await query.edit_message_text(text=texto, reply_markup=reply_markup)       
+    if query.data == 'ATRAS':
+        return P4
+    return P6
+
+async def p6(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
+    print("p6: ", str(update), str(context.user_data))
+    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    query = update.callback_query
+    await query.answer()
+    if query.data == 'NADA':
+        return None
+    if query.data in context.user_data['Lista']:
+        return None
+    if query.data == 'ATRAS':
+        codigo_eliminado = context.user_data['Lista'].pop()
+    else:
+        context.user_data['Lista'].append(query.data)
+    teclado = []
+    for fila in update.effective_message.reply_markup.inline_keyboard:
+        teclado.append([])
+        if len(fila) == 5:
+            for boton in fila:
+                texto = boton.text
+                if len(texto) > 3:
+                    texto = boton.text[3:]
+                if texto in context.user_data['Lista']:
+                    posicion = str(context.user_data['Lista'].index(texto) + 1)
+                    texto = 'P' + posicion + ' ' + texto
+                teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
+    teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
+    reply_markup = InlineKeyboardMarkup(teclado)
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    await query.edit_message_text(text=texto, reply_markup=reply_markup)       
+    if query.data == 'ATRAS':
+        return P5
+    return P7
+
+async def p7(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
+    print("p7: ", str(update), str(context.user_data))
+    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    query = update.callback_query
+    await query.answer()
+    if query.data == 'NADA':
+        return None
+    if query.data in context.user_data['Lista']:
+        return None
+    if query.data == 'ATRAS':
+        codigo_eliminado = context.user_data['Lista'].pop()
+    else:
+        context.user_data['Lista'].append(query.data)
+    teclado = []
+    for fila in update.effective_message.reply_markup.inline_keyboard:
+        teclado.append([])
+        if len(fila) == 5:
+            for boton in fila:
+                texto = boton.text
+                if len(texto) > 3:
+                    texto = boton.text[3:]
+                if texto in context.user_data['Lista']:
+                    posicion = str(context.user_data['Lista'].index(texto) + 1)
+                    texto = 'P' + posicion + ' ' + texto
+                teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
+    teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
+    if not query.data == 'ATRAS':
+        teclado.append([InlineKeyboardButton("Confirmar", callback_data='CONFIRMAR')])
+    reply_markup = InlineKeyboardMarkup(teclado)
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    await query.edit_message_text(text=texto, reply_markup=reply_markup)       
+    if query.data == 'ATRAS':
+        return P6
+    return GUARDAR_PILOTOS
+
+# async def elegir_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+#     print("elegir pilotos: ", str(update), str(context.user_data))
+#     query = update.callback_query
+#     await query.answer()
+#     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+#     if query.data == 'NADA':
+#         return ELEGIR_PILOTOS
+#     cuenta_pilotos = len(context.user_data['Lista'])    
+#     if query.data == 'ATRAS':
+#         if cuenta_pilotos > 0:
+#             codigo_eliminado = context.user_data['Lista'].pop()
+#     else:
+#         if cuenta_pilotos < 7:
+#             if not query.data in context.user_data['Lista']:
+#                 context.user_data['Lista'].append(query.data)
+#     pilotoslista = context.user_data['ListaPilotosOrdenada']
+#     COLUMNAS = 5
+#     keyboard = []
+#     cuenta_columnas = COLUMNAS
+#     for pilotonumer in pilotoslista:
+#         pos = ''
+#         if COLUMNAS == cuenta_columnas:
+#             keyboard.append([])
+#             cuenta_columnas = 0
+#         if pilotonumer[1]['codigo'] in context.user_data['Lista']:
+#             p = context.user_data['Lista'].index(pilotonumer[1]['codigo']) + 1
+#             pos = 'P' + str(p) + ' '
+#         keyboard[len(keyboard) - 1].append(InlineKeyboardButton(pos + pilotonumer[1]['codigo'], callback_data=pilotonumer[1]['codigo']))
+#         cuenta_columnas = cuenta_columnas + 1
+#     if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
+#         for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
+#             keyboard[len(keyboard) - 1].append(InlineKeyboardButton(' ', callback_data='NADA'))
+#     cuenta_pilotos = len(context.user_data['Lista'])
+#     if cuenta_pilotos > 0:
+#         keyboard.append([
+#             InlineKeyboardButton("Atras", callback_data='ATRAS'),
+#         ])
+#     if cuenta_pilotos == 7:
+#         keyboard.append([
+#             InlineKeyboardButton("CONFIRMAR", callback_data='CONFIRMAR'),
+#         ])
+#     reply_markup = InlineKeyboardMarkup(keyboard)
+#     texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+#     await query.edit_message_text(text=texto, reply_markup=reply_markup)
+#     return ELEGIR_PILOTOS
+
+# async def confirmar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    # query = update.callback_query
+    # await query.answer()
+    # if query.data == 'NADA':
+    #     return None
+    # cuenta_pilotos = len(context.user_data['Lista'])    
+    # if query.data == 'ATRAS':
+    #     codigo_eliminado = context.user_data['Lista'].pop()
+    #     return P7
+    # else:
+    #     context.user_data['Lista'].append(query.data)
+    # teclado = []
+    # for fila in update.effective_message.reply_markup.inline_keyboard:
+    #     teclado.append([])
+    #     for boton in fila:
+    #         texto = boton.text
+    #         # if boton.text in context.user_data['Lista']:
+    #         #     texto = 'P7 ' + boton.text
+    #         teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
+    
+    # reply_markup = InlineKeyboardMarkup(teclado)    
+    # texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    # await query.edit_message_text(text=texto, reply_markup=reply_markup)       
+    # return GUARDAR_PILOTOS
+
+async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    print("guardar pilotos: ", str(update), str(context.user_data))
+    query = update.callback_query
+    await query.answer()
+    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    if query.data == 'ATRAS':
+        codigo_eliminado = context.user_data['Lista'].pop()
+        teclado = []
+        for fila in update.effective_message.reply_markup.inline_keyboard:
+            teclado.append([])
+            if len(fila) == 5:
+                for boton in fila:
+                    texto = boton.text
+                    if len(texto) > 3:
+                        texto = boton.text[3:]
+                    if texto in context.user_data['Lista']:
+                        posicion = str(context.user_data['Lista'].index(texto) + 1)
+                        texto = 'P' + posicion + ' ' + texto
+                    teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
+        teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
+        reply_markup = InlineKeyboardMarkup(teclado)
+        texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+        await query.edit_message_text(text=texto, reply_markup=reply_markup)
+        return P7
     user = query.from_user
     data = ",".join(context.user_data['Lista'])
     now = datetime.now()
@@ -948,13 +1233,17 @@ async def actualizar_tablas():
 
 def get_application():
     pilotoslista = dbPilotos.get('2023')['Lista']
-    filtropilotos = 'ATRAS'
+    filtropilotos = 'NADA|ATRAS|'
     for pilotonumer in pilotoslista:
         filtropilotos = filtropilotos + '|' + pilotoslista[pilotonumer]['codigo']
     filtropilotos = '^(' + filtropilotos + ')$'
+    # persistence = PicklePersistence(filepath="/tmp/conversationbot")
+    # application = Application.builder().token(BotToken).persistence(persistence).build()
     application = Application.builder().token(BotToken).build()
     conv_handler = ConversationHandler(
         entry_points=[
+            # CallbackQueryHandler(inicio_pilotos, pattern="quiniela$"),
+            # CallbackQueryHandler(elegir_pilotos, pattern=filtropilotos)
             CommandHandler("quiniela", inicio_pilotos), 
             CommandHandler("start", start),
             CommandHandler("help", help),
@@ -968,7 +1257,16 @@ def get_application():
             CommandHandler("revisarpagos", revisarpagos),
             ],
         states={
-            ELEGIR_PILOTOS:[CallbackQueryHandler(elegir_pilotos, pattern=filtropilotos), CallbackQueryHandler(confirmar_pilotos, pattern="^CONFIRMAR$")], 
+            # ELEGIR_PILOTOS:[CallbackQueryHandler(elegir_pilotos, pattern=filtropilotos), CallbackQueryHandler(confirmar_pilotos, pattern="^CONFIRMAR$")], 
+            P1:[CallbackQueryHandler(p1, pattern=filtropilotos)],
+            P2:[CallbackQueryHandler(p2, pattern=filtropilotos) ],
+            P3:[CallbackQueryHandler(p3, pattern=filtropilotos) ],
+            P4:[CallbackQueryHandler(p4, pattern=filtropilotos) ],
+            P5:[CallbackQueryHandler(p5, pattern=filtropilotos) ],
+            P6:[CallbackQueryHandler(p6, pattern=filtropilotos) ],
+            P7:[CallbackQueryHandler(p7, pattern=filtropilotos) ],
+            # CONFIRMAR_PILOTOS:[CallbackQueryHandler(confirmar_pilotos, pattern=filtropilotos), CallbackQueryHandler(p7, pattern='^ATRAS$')],
+            GUARDAR_PILOTOS:[CallbackQueryHandler(guardar_pilotos, pattern='^(CONFIRMAR|ATRAS)$')],
             MENU_AYUDA: [CallbackQueryHandler(reglas, pattern="^" + REGLAS + "$"), CallbackQueryHandler(ayuda, pattern="^" + AYUDA + "$")],
             VALIDARPAGO: [MessageHandler(filters.Regex('^Si$'), validarpago), MessageHandler(filters.Regex('^No$'), finpagos)], 
             SIGUIENTEPAGO: [MessageHandler(filters.Regex('^Si$'), pagovalidado), MessageHandler(filters.Regex('^No$'), pagorechazado)], 
@@ -977,7 +1275,26 @@ def get_application():
             SUBIRCOMPROBANTE: [MessageHandler(filters.Regex('^(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|Todas)$'), subir_comprobante)],
             },
         fallbacks=[CommandHandler("cancelar", cancelar)],
+        # fallbacks=[CallbackQueryHandler(cancelar, pattern="cancelar$")],
+        # per_message=True,
+        # name="my_conversation",
+        # persistent=True,
+        block=False,
     )
+    # application.add_handlers([
+    #         CommandHandler("quiniela", inicio_pilotos), 
+    #         CommandHandler("start", start),
+    #         CommandHandler("help", help),
+    #         CommandHandler("quinielas", quinielas),
+    #         CommandHandler("general", general),
+    #         CommandHandler("resultados", resultados),
+    #         CommandHandler("cancelar", cancelar),
+    #         CommandHandler("proxima", proxima),
+    #         CommandHandler("mipago", mipago),
+    #         CommandHandler("pagos", pagos),
+    #         CommandHandler("revisarpagos", revisarpagos),
+    #         conv_handler,
+    #         ])
     application.add_handler(conv_handler)
 
     return application
@@ -990,6 +1307,7 @@ app = FastAPI()
 @app.post("/webhook")
 async def webhook_handler(req: Request):
     data = await req.json()
+    # print('webhook: ', data)
     async with application:            
         await application.bot.set_my_commands(
             [
