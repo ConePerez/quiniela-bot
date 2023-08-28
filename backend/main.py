@@ -52,12 +52,12 @@ from telegram.ext import (
 
 # Enable logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
 )
+# set higher logging level for httpx to avoid all GET and POST requests being logged
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
-chandles = logging.StreamHandler()
-chandles.setLevel(logging.INFO)
-logger.addHandler(chandles)
 
 deta = Deta()
 BotToken = os.getenv("BOT_TOKEN")
@@ -71,7 +71,7 @@ dbPuntosPilotos = deta.Base('PuntosPilotos')
 dbCarreras = deta.Base('Carreras')
 dbfavoritos = deta.Base("Favoritos")
 dbHistorico = deta.Base('Historico')
-dbquiniela = deta.Base("Quiniela")
+dbQuiniela = deta.Base("Quiniela")
 dbPilotos = deta.Base("Pilotos")
 dbPagos = deta.Base('Pagos')
 dbConfiguracion= deta.Base('Configuracion')
@@ -108,8 +108,7 @@ def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     tablaquiniela.title = carrera_nombre
     tablaquiniela.field_names = ["Fecha/hora", "Nombre", "P1", "P2", "P3", "P4", "P5", "P6", "P7",]
     tablaquiniela.sortby = "Fecha/hora"
-    dbquiniela = deta.Base("Quiniela")
-    datosquiniela = dbquiniela.fetch({'Carrera':carrera_clave})
+    datosquiniela = dbQuiniela.fetch({'Carrera':carrera_clave})
     filas = datosquiniela.items    
     datos_posiciones = {'P1': [], 'P2': [], 'P3': [], 'P4': [], 'P5': [], 'P6': [], 'P7': []}        
     for index in range(datosquiniela.count):
@@ -251,8 +250,7 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     tablapagos.title = 'Tabal de pagos'
     tablapagos.field_names = ["Nombre", "Total Rondas", "Rondas Pagadas", "Rondas Confirmadas"]
     tablapagos.sortby = "Nombre"
-    dbquiniela = deta.Base("Quiniela")
-    datosquiniela = dbquiniela.fetch()
+    datosquiniela = dbQuiniela.fetch()
     for usuarioquiniela in datosquiniela.items:
         pagosusuarios = dbPagos.fetch([{'usuario':usuarioquiniela['key'], 'estado':'guardado'},{'usuario':usuarioquiniela['key'], 'estado':'confirmado'} ])
         rondas_pagadas = 0
@@ -437,7 +435,7 @@ async def validarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     else:
         pago_confirmar = pagos_guardados.items[0]
         numero_carreras = pago_confirmar['carreras']
-        usuario = dbquiniela.get(pago_confirmar['usuario'])['Nombre']
+        usuario = dbQuiniela.get(pago_confirmar['usuario'])['Nombre']
         context.user_data["pago"] = pago_confirmar['key']
         await update.message.reply_photo(
             pago_confirmar['foto'], 
@@ -906,7 +904,7 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     apellido = ''
     if(user.last_name is not None):
         apellido = ' ' + user.last_name
-    dbquiniela.put({"Carrera": carrera_quiniela.items[0]['key'], "Lista": data, "FechaHora":now.isoformat(), "Nombre":user.first_name + apellido, "key": str(user.id)})
+    dbQuiniela.put({"Carrera": carrera_quiniela.items[0]['key'], "Lista": data, "FechaHora":now.isoformat(), "Nombre":user.first_name + apellido, "key": str(user.id)})
     texto = "Tu lista para la carrera " + carrera_quiniela.items[0]['Nombre'] + " se ha guardado en la base de datos. Quedo de la siguiente manera:\n"
     for index, codigo in enumerate(context.user_data['Lista']):
         texto = texto + 'P' + str(index + 1) + ' ' + codigo + '\n'
@@ -931,14 +929,8 @@ async def actualizar_tablas():
 
     carrera_no_enviada = dbCarreras.fetch([{'Estado':'NO_ENVIADA'}])
     if carrera_no_enviada.count > 0:
-        archivo_log = documentos.get('Log_' + carrera_no_enviada.items[0]['key'] + '.txt')
-        contenido_anterior = archivo_log.read()
-        archivo_log.close()
-        contenido_nuevo = ''
-
         print("imprimir tabla resultados")
         logger.info("Imprimir tabla de resultados")
-        contenido_nuevo += hora_actual_utc.isoformat() + ' Imprimir Tabla de Resultados\n'
         im, texto = crear_tabla_resultados()
         with BytesIO() as tablaresutados_imagen:    
             im.save(tablaresutados_imagen, "png")
@@ -951,7 +943,6 @@ async def actualizar_tablas():
             
         print("imprimir tabla de resultados carrera")
         logger.info("Imprimir tabla de resultados carrera")
-        contenido_nuevo += hora_actual_utc.isoformat() + ' Imprimir Tabla Resultados Pilotos\n'
         im, carrera = crear_tabla_puntos(carrera_no_enviada.items[0])
         texto = 'Resultados de la carrera: ' + carrera
         with BytesIO() as tabla_puntos_imagen:    
@@ -965,7 +956,6 @@ async def actualizar_tablas():
             
         print("imprimir tabla general")
         logger.info("Imprimir tabla general")
-        contenido_nuevo += hora_actual_utc.isoformat() + ' Imprimir Tabla General\n'
         im, total_rondas = crear_tabla_general()
         texto = "Total de rondas incluidas: " + str(total_rondas)
         with BytesIO() as tablageneral_imagen:    
@@ -976,7 +966,6 @@ async def actualizar_tablas():
                 photo=tablageneral_imagen, 
                 caption=texto
                 )
-        documentos.put('Log_' + carrera_no_enviada.items[0]['key'] + '.txt', contenido_anterior + bytes(contenido_nuevo, 'utf-8'))
         dbCarreras.update(updates={'Estado':'ARCHIVADA'}, key=carrera_no_enviada.items[0]['key'])
         
     encurso_siguiente_Carrera = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
@@ -1010,17 +999,11 @@ async def actualizar_tablas():
                     'hora_termino': session_row['endTime'] + session_row['gmtOffset'],
                 }
             dbCarreras.put(carrera_dict)
-            archivo_log = documentos.put('Log_' + carrera_codigo + '.txt', hora_actual_utc.isoformat() + ' Empiezo log\n')
     else:
-        archivo_log = documentos.get('Log_' + encurso_siguiente_Carrera.items[0]['key'] + '.txt')
-        contenido_anterior = archivo_log.read()
-        archivo_log.close()
-        contenido_nuevo = ''
         estado_Carrera = encurso_siguiente_Carrera.items[0]['Estado']
         if(estado_Carrera == 'IDLE'):
             horaempiezo_Carrera = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Empiezo'])
             horaempiezo_Carrera_utc = horaempiezo_Carrera.astimezone(utc)
-            contenido_nuevo += hora_actual_utc.isoformat() + ' Carrera en IDLE con empiezo el ' + horaempiezo_Carrera_utc.isoformat() + '\n'
             if(hora_actual_utc > horaempiezo_Carrera_utc):
                 carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
                 dbCarreras.update(updates={'Estado':'EN-CURSO'}, key=carrera_codigo)
@@ -1033,14 +1016,10 @@ async def actualizar_tablas():
             horario_q_sesion_utc = horario_q_sesion.astimezone(utc)
             estado_qualy = encurso_siguiente_Carrera.items[0]['q']['estado']
 
-            print('hora qualy: ', horario_q_sesion_utc.isoformat())
-            contenido_nuevo += hora_actual_utc.isoformat() + ' El horario de la qualy es ' + horario_q_sesion_utc.isoformat() + '\n'
-            contenido_nuevo += hora_actual_utc.isoformat() + ' El estado de la qualy es ' + estado_qualy + '\n'
-            
+            print('hora qualy: ', horario_q_sesion_utc.isoformat()) 
             if hora_actual_utc >= horario_q_sesion_utc and estado_qualy == 'upcoming':
                 #mandar tabla quinielas
                 print('entro a crear tabla quinielas')
-                contenido_nuevo += hora_actual_utc.isoformat() + ' Crear tabla de las quinielas\n'
                 im, carrera_nombre, texto_estadisticas = crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
                 texto = "Quinielas para la carrera " + encurso_siguiente_Carrera.items[0]['Nombre']
                 with BytesIO() as tablaquinielaimagen:    
@@ -1055,7 +1034,6 @@ async def actualizar_tablas():
                 cambiar_estado_qualy = encurso_siguiente_Carrera.items[0]['q']
                 cambiar_estado_qualy['estado'] = 'EMPEZADA'
                 dbCarreras.update(updates={'q':cambiar_estado_qualy}, key=carrera_codigo)
-                contenido_nuevo += hora_actual_utc.isoformat() + ' Cambiar estado de la qualy a EMPEZADA\n'
             revisar_Pilotos = dbPilotos.fetch({'Carrera':encurso_siguiente_Carrera.items[0]['key']})
             print('revisar_pilotos', revisar_Pilotos.count)
             if(revisar_Pilotos.count == 0):
@@ -1113,7 +1091,6 @@ async def actualizar_tablas():
                         dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
                         for id in response_dict:
                             piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
-                            print('pilotocount', piloto.count)
                             if(piloto.count == 0):
                                 record_pilotos = dbPilotos.get('2023')      
                                 listapilotos = record_pilotos['Lista']
@@ -1127,9 +1104,7 @@ async def actualizar_tablas():
                                 print('racingnumer', response_dict[id]['RacingNumber'])
                                 dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
                         # if(sesion_carrera == 'r'):                            
-            contenido_nuevo += hora_actual_utc.isoformat() + ' Horario de termino de la carrera ' + horario_termino_utc.isoformat() + '\n'
             if hora_actual_utc > horario_termino_utc:
-                contenido_nuevo += hora_actual_utc.isoformat() + ' Leer API de event tracker' + urlevent_tracker + '\n'
                 response = requests.get(url=urlevent_tracker, headers=headerapi)
                 response.encoding = 'utf-8-sig'
                 response_dict = response.json()
@@ -1140,7 +1115,6 @@ async def actualizar_tablas():
                     url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
                     if(not(url_results_index is None)):
                         print('hacer tabla resultados')
-                        contenido_nuevo += hora_actual_utc.isoformat() + ' Leer pagina de la Formula 1\n'
                         url_results = links[url_results_index]['url']
                         soup = BeautifulSoup(requests.get(url_results).text)
                         table = soup.find('table')
@@ -1161,7 +1135,7 @@ async def actualizar_tablas():
                                         'intervalo': row[6],
                                         'puntos': int(row[7])
                                         }
-                        datosquiniela = dbquiniela.fetch()
+                        datosquiniela = dbQuiniela.fetch()
                         quinielas = datosquiniela.items
                         dbPuntosPilotos.put({'key': encurso_siguiente_Carrera.items[0]['key'], 'Pilotos':posiciones_dict})
                         for i_quiniela in range(len(quinielas)):
@@ -1205,20 +1179,16 @@ async def actualizar_tablas():
                                     if(i_lista + 1 == posiciones_dict[numero_piloto]['posicion']):
                                         resultados['extras'] = resultados['extras'] + 2
                             historico_resultados[encurso_siguiente_Carrera.items[0]['key']] = resultados
-                            contenido_nuevo += hora_actual_utc.isoformat() + ' Actualizar quinielas y resultados en la tabla historicos\n'
                             dbHistorico.update(updates={ 
                                 'Quinielas': historico_quinielas, 
                                 'Resultados': historico_resultados, 
                                 }, key=quiniela['key'])
                         
                         dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
-                        contenido_nuevo += hora_actual_utc.isoformat() + ' Cambiar estado a NO_ENVIADA\n'
                         await bot_quiniela.send_message(
                             chat_id= float(controles['grupo']), 
                             text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
                             )
-                        documentos.put('Log_' + encurso_siguiente_Carrera.items[0]['key'] + '.txt', contenido_anterior + bytes(contenido_nuevo, 'utf-8'))
-        documentos.put('Log_' + encurso_siguiente_Carrera.items[0]['key'] + '.txt', contenido_anterior + bytes(contenido_nuevo, 'utf-8'))
     pagos_por_enviar = dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
     if pagos_por_enviar.count > 0:
         for pago in pagos_por_enviar.items:
@@ -1242,8 +1212,6 @@ def get_application():
     application = Application.builder().token(BotToken).build()
     conv_handler = ConversationHandler(
         entry_points=[
-            # CallbackQueryHandler(inicio_pilotos, pattern="quiniela$"),
-            # CallbackQueryHandler(elegir_pilotos, pattern=filtropilotos)
             CommandHandler("quiniela", inicio_pilotos), 
             CommandHandler("start", start),
             CommandHandler("help", help),
@@ -1279,24 +1247,10 @@ def get_application():
         # per_message=True,
         # name="my_conversation",
         # persistent=True,
-        block=False,
+        # block=False,
     )
-    # application.add_handlers([
-    #         CommandHandler("quiniela", inicio_pilotos), 
-    #         CommandHandler("start", start),
-    #         CommandHandler("help", help),
-    #         CommandHandler("quinielas", quinielas),
-    #         CommandHandler("general", general),
-    #         CommandHandler("resultados", resultados),
-    #         CommandHandler("cancelar", cancelar),
-    #         CommandHandler("proxima", proxima),
-    #         CommandHandler("mipago", mipago),
-    #         CommandHandler("pagos", pagos),
-    #         CommandHandler("revisarpagos", revisarpagos),
-    #         conv_handler,
-    #         ])
     application.add_handler(conv_handler)
-
+    # await application.bot.set_webhook(url=f"{public_url}/webhook", allowed_updates=Update.ALL_TYPES)
     return application
 
 application = get_application()
@@ -1308,7 +1262,8 @@ app = FastAPI()
 async def webhook_handler(req: Request):
     data = await req.json()
     # print('webhook: ', data)
-    async with application:            
+    async with application: 
+        # await application.bot.set_webhook(url=f"{public_url}/webhook", allowed_updates=Update.ALL_TYPES)           
         await application.bot.set_my_commands(
             [
                 BotCommand("start", "empezar el bot"),
