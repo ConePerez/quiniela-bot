@@ -1,4 +1,5 @@
 import os
+from time import sleep
 import logging
 import pytz
 import requests
@@ -11,6 +12,12 @@ from operator import itemgetter
 from io import BytesIO
 from telegram import __version__ as TG_VER
 from collections import Counter
+import uvicorn
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse, Response
+from starlette.routing import Route
+import asyncio
 
 try:
     from telegram import __version_info__
@@ -24,7 +31,7 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
         f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
     )
 
-from fastapi import FastAPI, Request
+# from fastapi import FastAPI, Request
 
 from telegram import (
     ReplyKeyboardMarkup,
@@ -60,8 +67,11 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 deta = Deta()
-BotToken = os.getenv("BOT_TOKEN")
-bot_hostname = os.getenv("DETA_SPACE_APP_HOSTNAME")
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+WEBHOOK_URL = 'https://' + os.getenv('DETA_SPACE_APP_HOSTNAME')
+PORT = int(os.getenv('PORT'))
+# BotToken = os.getenv("BOT_TOKEN")
+# bot_hostname = os.getenv("DETA_SPACE_APP_HOSTNAME")
 QUINIELA, FAVORITOS, CONFIRMAR_PENALIZACION, SUBIRCOMPROBANTE, GUARDARCOMPROBANTE, VALIDARPAGO, SIGUIENTEPAGO, FINPAGOS, MENU_AYUDA, GUARDAR_PILOTOS, CONFIRMAR_PILOTOS, P1, P2, P3, P4, P5, P6, P7 = range(18)
 REGLAS = 'reglas'
 AYUDA = 'ayuda'
@@ -912,7 +922,7 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return ConversationHandler.END
 
 async def actualizar_tablas():
-    bot_quiniela = Bot(BotToken)
+    bot_quiniela = Bot(BOT_TOKEN)
     F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
     urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
     headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
@@ -1201,16 +1211,26 @@ async def actualizar_tablas():
             dbPagos.update(updates={'enviado':True}, key=pago['key'])
     return
 
-def get_application():
+controles = dbConfiguracion.get('controles')
+
+async def main() -> None:
+    """Set up the application and a custom webserver."""
+    url = WEBHOOK_URL
+    port = PORT
     pilotoslista = dbPilotos.get('2023')['Lista']
     filtropilotos = 'NADA|ATRAS|'
     for pilotonumer in pilotoslista:
         filtropilotos = filtropilotos + '|' + pilotoslista[pilotonumer]['codigo']
     filtropilotos = '^(' + filtropilotos + ')$'
-    # persistence = PicklePersistence(filepath="/tmp/conversationbot")
-    # application = Application.builder().token(BotToken).persistence(persistence).build()
-    application = Application.builder().token(BotToken).build()
-    conv_handler = ConversationHandler(
+    # context_types = ContextTypes(context=CustomContext)
+    # Here we set updater to None because we want our custom webhook server to handle the updates
+    # and hence we don't need an Updater instance
+    application = (
+        Application.builder().token(BOT_TOKEN).updater(None).build()
+    )
+
+    # register handlers
+    conv_teclado = ConversationHandler(
         entry_points=[
             CommandHandler("quiniela", inicio_pilotos), 
             CommandHandler("start", start),
@@ -1249,60 +1269,86 @@ def get_application():
         # persistent=True,
         # block=False,
     )
-    application.add_handler(conv_handler)
-    # await application.bot.set_webhook(url=f"{public_url}/webhook", allowed_updates=Update.ALL_TYPES)
-    return application
+    application.add_handler(conv_teclado)
 
-application = get_application()
-controles = dbConfiguracion.get('controles')
+    # Pass webhook settings to telegram
+    await application.bot.delete_webhook()
+    sleep(3)
+    await application.bot.set_webhook(url=f"{url}/telegram", allowed_updates=Update.ALL_TYPES)
+    await application.bot.set_my_commands(
+        [
+            BotCommand("start", "empezar el bot"),
+            BotCommand("quiniela", "llenar la quiniela"),
+            BotCommand("mipago", "mandar comprobante pago"),
+            BotCommand("help", "mostrar reglas quiniela"),
+            BotCommand("cancelar", "cancelar una accion"),
+        ],
+        scope=BotCommandScopeAllPrivateChats()
+    )
+    await application.bot.set_my_commands(
+        [
+            BotCommand("quinielas", "quinielas al momento"),
+            BotCommand("resultados", "resultados ultima carrera"),
+            BotCommand("general", "tabla general"),
+            BotCommand("proxima", "cual es la proxima carrera"),
+            BotCommand("pagos", "tabla de pagos"),
+        ], 
+        scope=BotCommandScopeAllGroupChats()
+    )
+    await application.bot.set_my_commands(
+        [
+            BotCommand("start", "empezar el bot"),
+            BotCommand("quiniela", "llenar la quiniela"),
+            BotCommand("mipago", "mandar comprobante pago"),
+            BotCommand("revisarpagos", "revisar pagos pendientes"),
+            BotCommand("help", "mostrar reglas quiniela"),
+            BotCommand("cancelar", "cancelar una accion"),
+        ],
+        scope=BotCommandScopeChat(controles['tesorero'])
+    )
+    # Set up webserver
+    async def telegram(request: Request) -> Response:
+        """Handle incoming Telegram updates by putting them into the `update_queue`"""
+        # await application.update_queue.put(
+        #     Update.de_json(data=await request.json(), bot=application.bot)
+        # )
+        await application.process_update(Update.de_json(data=await request.json(), bot=application.bot))
+        return Response()
 
-app = FastAPI()
+    async def health(_: Request) -> PlainTextResponse:
+        """For the health endpoint, reply with a simple plain text message."""
+        return PlainTextResponse(content="The bot is still running fine :)")
 
-@app.post("/webhook")
-async def webhook_handler(req: Request):
-    data = await req.json()
-    # print('webhook: ', data)
-    async with application: 
-        # await application.bot.set_webhook(url=f"{public_url}/webhook", allowed_updates=Update.ALL_TYPES)           
-        await application.bot.set_my_commands(
-            [
-                BotCommand("start", "empezar el bot"),
-                BotCommand("quiniela", "llenar la quiniela"),
-                BotCommand("mipago", "mandar comprobante pago"),
-                BotCommand("help", "mostrar reglas quiniela"),
-                BotCommand("cancelar", "cancelar una accion"),
-            ],
-            scope=BotCommandScopeAllPrivateChats()
+    async def actions(req: Request):
+        data = await req.json()   
+        event = data['event']
+        if event['id'] == 'actualizartablas':
+            logger.info("Entro a actualizar tablas")
+            await actualizar_tablas()
+        return Response()
+
+    starlette_app = Starlette(
+        routes=[
+            Route("/telegram", telegram, methods=["POST"]),
+            Route("/healthcheck", health, methods=["GET"]),
+            Route("/__space/v0/actions", actions, methods=["POST"]),
+        ]
+    )
+    webserver = uvicorn.Server(
+        config=uvicorn.Config(
+            app=starlette_app,
+            port=port,
+            use_colors=False,
+            host="127.0.0.1",
         )
-        await application.bot.set_my_commands(
-            [
-                BotCommand("quinielas", "quinielas al momento"),
-                BotCommand("resultados", "resultados ultima carrera"),
-                BotCommand("general", "tabla general"),
-                BotCommand("proxima", "cual es la proxima carrera"),
-                BotCommand("pagos", "tabla de pagos"),
-            ], 
-            scope=BotCommandScopeAllGroupChats()
-        )
-        await application.bot.set_my_commands(
-            [
-                BotCommand("start", "empezar el bot"),
-                BotCommand("quiniela", "llenar la quiniela"),
-                BotCommand("mipago", "mandar comprobante pago"),
-                BotCommand("revisarpagos", "revisar pagos pendientes"),
-                BotCommand("help", "mostrar reglas quiniela"),
-                BotCommand("cancelar", "cancelar una accion"),
-            ],
-            scope=BotCommandScopeChat(controles['tesorero'])
-        )
+    )
+
+    # Run application and webserver together
+    async with application:
         await application.start()
-        await application.process_update(Update.de_json(data=data, bot=application.bot))
+        await webserver.serve()
         await application.stop()
 
-@app.post('/__space/v0/actions')
-async def actions(req: Request):
-  data = await req.json()
-  event = data['event']
-  if event['id'] == 'actualizartablas':
-    logger.info("Entro a actualizar tablas")
-    await actualizar_tablas()
+
+if __name__ == "__main__":
+    asyncio.run(main())
