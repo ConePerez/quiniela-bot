@@ -21,7 +21,7 @@ micros:
         - name: BOT_TOKEN
           description: Telegram BOT Token
     public_routes:
-      - "/webhook"
+      - "/telegram"
       # - "/quinieladb"
     actions:
       - id: "actualizartablas"

@@ -59,7 +59,7 @@ from telegram.ext import (
 
 # Enable logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.WARNING
 )
 # set higher logging level for httpx to avoid all GET and POST requests being logged
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -139,7 +139,7 @@ def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
             texto_estadisticas = texto_estadisticas + pos
             contador = dict(sorted(contador.items(), key=lambda item: item[1], reverse=True))
             for piloto, repeticion in contador.items():
-                texto_estadisticas = texto_estadisticas + ' ' + piloto + ' ' + str(100 * repeticion/total ) + '%'
+                texto_estadisticas = texto_estadisticas + ' ' + piloto + ' ' + str( round(100 * repeticion/total, 1) ) + '%'
             texto_estadisticas = texto_estadisticas + '\n'
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
@@ -165,9 +165,7 @@ def crear_tabla_general():
         normales = 0
         extras = 0
         penalizaciones = 0
-        print(usuario['key'])
         for carrera in usuario['Resultados']:
-            print(usuario['Resultados'][carrera])
             normales = normales + usuario['Resultados'][carrera]['normales']
             extras = extras + usuario['Resultados'][carrera]['extras']
             penalizaciones = penalizaciones + usuario['Resultados'][carrera]['penalizaciones']
@@ -188,7 +186,6 @@ def crear_tabla_resultados():
     maximo_horario = datetime.fromisoformat('2023-01-01T00:00:00.000+00:00')
     ultima_carrera_archivada = ''
     for carrera in carreras.items:
-        print(carrera['key'], carrera['Termino'])
         horario_Carrera = datetime.fromisoformat(carrera['Termino'])
         if(horario_Carrera > maximo_horario):
             maximo_horario = horario_Carrera
@@ -229,7 +226,10 @@ def crear_tabla_resultados():
             linea = True
         else:
             tablaresultados.add_row(resultado)
-    texto_ganador = texto_ganador + ganador + '. Con un total de ' + str(puntos_ganador) + ' puntos.'
+    if puntos_ganador >= 90:
+        texto_ganador = texto_ganador + ganador + '. Con un total de ' + str(puntos_ganador) + ' puntos.'
+    else:
+        texto_ganador = 'No hubo ganador para la carrera: ' + carrera_nombre + '. Nadie logro hacer mas de 90 puntos. El premio se acumula para la /proxima carrera.'
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
     letra = ImageFont.truetype("Menlo.ttc", 15)
@@ -243,7 +243,7 @@ def crear_tabla_resultados():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Informar al usuario que es lo que puede hacer"""
-    print("entro start", update)
+    logger.warning('Entro a start')
     texto =  "Bienvenido a la quiniela de F1 usa /quiniela para seleccionar a los pilotos del 1-7, /mipago para subir un comprobante de pago y /help para ver la ayuda. En cualquier momento puedes usar /cancelar para cancelar cualquier comando."
     await update.message.reply_text(
         texto, 
@@ -266,10 +266,15 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         rondas_pagadas = 0
         rondas_confirmadas = 0
         for pagousuario in pagosusuarios.items:
-            rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
+            if str(pagousuario['carreras']) == 'Todas':
+                rondas_pagadas = configuracion['rondas']
+            else:
+                rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
             if pagousuario['estado'] == 'confirmado':
-                rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
-            
+                if pagousuario['carreras'] == 'Todas':
+                    rondas_confirmadas = configuracion['rondas']
+                else:
+                    rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
         tablapagos.add_row([usuarioquiniela['Nombre'], configuracion['rondas'], str(rondas_pagadas), str(rondas_confirmadas)]) 
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
@@ -321,12 +326,11 @@ async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels and ends the conversation."""
-    print('cancelar: ', str(update))
     user = update.message.from_user
     # dbprueba = deta.Base('simple_db')
     # dbprueba.put({'prueba':str(user)})
     # dbprueba.put({'update':str(update)})
-    logger.info("User %s canceled the conversation.", user.first_name)
+    logger.warning("User %s canceled the conversation.", user.first_name)
     await update.message.reply_text(
         "Comando cancelado, puedes empezar de nuevo con el comando /start", 
         reply_markup=ReplyKeyboardRemove()
@@ -352,7 +356,7 @@ async def reglas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     contenido = guia_usuario.read()
     guia_usuario.close()
     await query.edit_message_text(text="Ok, en un nuevo mensaje te envio el documento")
-    await application.bot.send_document(
+    await context.bot.send_document(
         chat_id= query.from_user.id,
         document=contenido, 
         filename="Reglas Quiniela.pdf",
@@ -367,7 +371,7 @@ async def ayuda(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     contenido = guia_usuario.read()
     guia_usuario.close()
     await query.edit_message_text(text="Ok, en un nuevo mensaje te envio el documento")
-    await application.bot.send_document(
+    await context.bot.send_document(
         chat_id= query.from_user.id,
         document=contenido, 
         filename="Ayuda General Quiniela.pdf",
@@ -514,9 +518,7 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def general(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    print("entro a general")
     im, total_rondas = crear_tabla_general()
-    print("regreso de imprimir resultados, con total de rondas: ", str(total_rondas))
     with BytesIO() as tablaresutados_imagen:    
         im.save(tablaresutados_imagen, "png")
         tablaresutados_imagen.seek(0)
@@ -526,9 +528,7 @@ async def general(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Sends a picture"""
     # aggregar un if, si hay carrera en curso mandar mensaje de espera
-    print("Entro a resultados")
     im, texto = crear_tabla_resultados()
-    print("Regreso con este texto de resultados: ", texto)
     with BytesIO() as tablaresutados_imagen:    
         im.save(tablaresutados_imagen, "png")
         tablaresutados_imagen.seek(0)
@@ -536,7 +536,6 @@ async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    print("inicio pilotos: ", str(update), str(context.user_data))
     context.user_data['Lista'] = []
     puntospilotos = dbPuntosPilotos.fetch()
     pilotoslista = dbPilotos.get('2023')['Lista']
@@ -577,7 +576,6 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return P1
 
 async def p1(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    print("p1: ", str(update), str(context.user_data))
     hay_boton_atras = False
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     query = update.callback_query
@@ -612,7 +610,6 @@ async def p1(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     return P2
 
 async def p2(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    print("p2: ", str(update), str(context.user_data))
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     query = update.callback_query
     await query.answer()
@@ -645,7 +642,6 @@ async def p2(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     return P3
 
 async def p3(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    print("p3: ", str(update), str(context.user_data))
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     query = update.callback_query
     await query.answer()
@@ -678,7 +674,6 @@ async def p3(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     return P4
 
 async def p4(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    print("p4: ", str(update), str(context.user_data))
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     query = update.callback_query
     await query.answer()
@@ -711,7 +706,6 @@ async def p4(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     return P5
 
 async def p5(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    print("p5: ", str(update), str(context.user_data))
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     query = update.callback_query
     await query.answer()
@@ -744,7 +738,6 @@ async def p5(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     return P6
 
 async def p6(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    print("p6: ", str(update), str(context.user_data))
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     query = update.callback_query
     await query.answer()
@@ -777,7 +770,6 @@ async def p6(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     return P7
 
 async def p7(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    print("p7: ", str(update), str(context.user_data))
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     query = update.callback_query
     await query.answer()
@@ -884,7 +876,6 @@ async def p7(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     # return GUARDAR_PILOTOS
 
 async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    print("guardar pilotos: ", str(update), str(context.user_data))
     query = update.callback_query
     await query.answer()
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
@@ -934,13 +925,11 @@ async def actualizar_tablas():
     hora_actual = hora_actual.astimezone()
     hora_actual_utc = hora_actual.astimezone(utc)
 
-    print('hora actual: ', hora_actual_utc.isoformat())
-    logger.info("Comenzo el proceso de actualizar tablas")
+    logger.warning("Comenzo el proceso de actualizar tablas")
 
     carrera_no_enviada = dbCarreras.fetch([{'Estado':'NO_ENVIADA'}])
     if carrera_no_enviada.count > 0:
-        print("imprimir tabla resultados")
-        logger.info("Imprimir tabla de resultados")
+        logger.warning("Imprimir tabla de resultados")
         im, texto = crear_tabla_resultados()
         with BytesIO() as tablaresutados_imagen:    
             im.save(tablaresutados_imagen, "png")
@@ -950,9 +939,7 @@ async def actualizar_tablas():
                 photo=tablaresutados_imagen, 
                 caption=texto
                 )
-            
-        print("imprimir tabla de resultados carrera")
-        logger.info("Imprimir tabla de resultados carrera")
+        logger.warning("Imprimir tabla de resultados carrera")
         im, carrera = crear_tabla_puntos(carrera_no_enviada.items[0])
         texto = 'Resultados de la carrera: ' + carrera
         with BytesIO() as tabla_puntos_imagen:    
@@ -964,8 +951,7 @@ async def actualizar_tablas():
                 caption=texto
                 )
             
-        print("imprimir tabla general")
-        logger.info("Imprimir tabla general")
+        logger.warning("Imprimir tabla general")
         im, total_rondas = crear_tabla_general()
         texto = "Total de rondas incluidas: " + str(total_rondas)
         with BytesIO() as tablageneral_imagen:    
@@ -1017,7 +1003,6 @@ async def actualizar_tablas():
             if(hora_actual_utc > horaempiezo_Carrera_utc):
                 carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
                 dbCarreras.update(updates={'Estado':'EN-CURSO'}, key=carrera_codigo)
-                contenido_nuevo += hora_actual_utc.isoformat() + ' Cambio a EN-CURSO\n'
         else:
             horario_termino = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino'])
             horario_termino_utc = horario_termino.astimezone(utc)
@@ -1026,10 +1011,8 @@ async def actualizar_tablas():
             horario_q_sesion_utc = horario_q_sesion.astimezone(utc)
             estado_qualy = encurso_siguiente_Carrera.items[0]['q']['estado']
 
-            print('hora qualy: ', horario_q_sesion_utc.isoformat()) 
             if hora_actual_utc >= horario_q_sesion_utc and estado_qualy == 'upcoming':
                 #mandar tabla quinielas
-                print('entro a crear tabla quinielas')
                 im, carrera_nombre, texto_estadisticas = crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
                 texto = "Quinielas para la carrera " + encurso_siguiente_Carrera.items[0]['Nombre']
                 with BytesIO() as tablaquinielaimagen:    
@@ -1045,7 +1028,6 @@ async def actualizar_tablas():
                 cambiar_estado_qualy['estado'] = 'EMPEZADA'
                 dbCarreras.update(updates={'q':cambiar_estado_qualy}, key=carrera_codigo)
             revisar_Pilotos = dbPilotos.fetch({'Carrera':encurso_siguiente_Carrera.items[0]['key']})
-            print('revisar_pilotos', revisar_Pilotos.count)
             if(revisar_Pilotos.count == 0):
                 response = requests.get(url=urlevent_tracker, headers=headerapi)
                 response.encoding = 'utf-8-sig'
@@ -1060,7 +1042,6 @@ async def actualizar_tablas():
                     dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
                     for id in response_dict:
                         piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
-                        print('pilotocount', piloto.count)
                         if(piloto.count == 0):
                             record_pilotos = dbPilotos.get('2023')      
                             listapilotos = record_pilotos['Lista']
@@ -1071,7 +1052,6 @@ async def actualizar_tablas():
                                 'Equipo':response_dict[id]['TeamName'],
                                 'AcumuladoPuntos':0
                             }
-                            print('racingnumer', response_dict[id]['RacingNumber'])
                             dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
             else:    
                 horario_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0][revisar_Pilotos.items[0]['Sesion']]['hora_termino']) 
@@ -1111,7 +1091,6 @@ async def actualizar_tablas():
                                     'Equipo':response_dict[id]['TeamName'],
                                     'AcumuladoPuntos':0
                                 }
-                                print('racingnumer', response_dict[id]['RacingNumber'])
                                 dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
                         # if(sesion_carrera == 'r'):                            
             if hora_actual_utc > horario_termino_utc:
@@ -1124,7 +1103,7 @@ async def actualizar_tablas():
                     links = response_dict['links']                                
                     url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
                     if(not(url_results_index is None)):
-                        print('hacer tabla resultados')
+                        
                         url_results = links[url_results_index]['url']
                         soup = BeautifulSoup(requests.get(url_results).text)
                         table = soup.find('table')
@@ -1199,6 +1178,7 @@ async def actualizar_tablas():
                             chat_id= float(controles['grupo']), 
                             text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
                             )
+                        logger.warning('Llego hasta el final del codigo')
     pagos_por_enviar = dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
     if pagos_por_enviar.count > 0:
         for pago in pagos_por_enviar.items:
@@ -1312,6 +1292,7 @@ async def main() -> None:
         # await application.update_queue.put(
         #     Update.de_json(data=await request.json(), bot=application.bot)
         # )
+        logger.warning(str(await request.json()))
         await application.process_update(Update.de_json(data=await request.json(), bot=application.bot))
         return Response()
 
@@ -1320,7 +1301,8 @@ async def main() -> None:
         return PlainTextResponse(content="The bot is still running fine :)")
 
     async def actions(req: Request):
-        data = await req.json()   
+        data = await req.json()  
+        logger.warning(str(data)) 
         event = data['event']
         if event['id'] == 'actualizartablas':
             logger.info("Entro a actualizar tablas")
@@ -1332,7 +1314,8 @@ async def main() -> None:
             Route("/telegram", telegram, methods=["POST"]),
             Route("/healthcheck", health, methods=["GET"]),
             Route("/__space/v0/actions", actions, methods=["POST"]),
-        ]
+        ],
+        debug=True
     )
     webserver = uvicorn.Server(
         config=uvicorn.Config(
@@ -1340,6 +1323,7 @@ async def main() -> None:
             port=port,
             use_colors=False,
             host="127.0.0.1",
+            log_level='debug',
         )
     )
 
