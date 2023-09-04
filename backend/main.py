@@ -59,7 +59,7 @@ from telegram.ext import (
 
 # Enable logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.WARNING
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 # set higher logging level for httpx to avoid all GET and POST requests being logged
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -912,284 +912,294 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.edit_message_text(text=texto)
     return ConversationHandler.END
 
-async def actualizar_tablas():
-    bot_quiniela = Bot(BOT_TOKEN)
-    F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
-    urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
-    headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
-    urllivetiming = 'https://livetiming.formula1.com/static/'
-    controles = dbConfiguracion.get('controles')
+# async def actualizar_tablas():
+    # bot_quiniela = Bot(BOT_TOKEN)
+    # F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
+    # urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
+    # headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
+    # urllivetiming = 'https://livetiming.formula1.com/static/'
+    # controles = dbConfiguracion.get('controles')
     
-    utc = pytz.utc
-    hora_actual = datetime.now()
-    hora_actual = hora_actual.astimezone()
-    hora_actual_utc = hora_actual.astimezone(utc)
+    # utc = pytz.utc
+    # hora_actual = datetime.now()
+    # hora_actual = hora_actual.astimezone()
+    # hora_actual_utc = hora_actual.astimezone(utc)
 
-    logger.warning("Comenzo el proceso de actualizar tablas")
+    # logger.warning("Comenzo el proceso de actualizar tablas")
 
-    carrera_no_enviada = dbCarreras.fetch([{'Estado':'NO_ENVIADA'}])
-    if carrera_no_enviada.count > 0:
-        logger.warning("Imprimir tabla de resultados")
-        im, texto = crear_tabla_resultados()
-        with BytesIO() as tablaresutados_imagen:    
-            im.save(tablaresutados_imagen, "png")
-            tablaresutados_imagen.seek(0)
-            await bot_quiniela.send_photo(
-                chat_id= float(controles['grupo']),
-                photo=tablaresutados_imagen, 
-                caption=texto
-                )
-        logger.warning("Imprimir tabla de resultados carrera")
-        im, carrera = crear_tabla_puntos(carrera_no_enviada.items[0])
-        texto = 'Resultados de la carrera: ' + carrera
-        with BytesIO() as tabla_puntos_imagen:    
-            im.save(tabla_puntos_imagen, "png")
-            tabla_puntos_imagen.seek(0)
-            await bot_quiniela.send_photo(
-                chat_id= float(controles['grupo']),
-                photo=tabla_puntos_imagen, 
-                caption=texto
-                )
+    # carrera_no_enviada = dbCarreras.fetch([{'Estado':'NO_ENVIADA'}])
+    # if carrera_no_enviada.count > 0:
+    #     logger.warning("Imprimir tabla de resultados")
+    #     im, texto = crear_tabla_resultados()
+    #     with BytesIO() as tablaresutados_imagen:    
+    #         im.save(tablaresutados_imagen, "png")
+    #         tablaresutados_imagen.seek(0)
+    #         await bot_quiniela.send_photo(
+    #             chat_id= float(controles['grupo']),
+    #             photo=tablaresutados_imagen, 
+    #             caption=texto
+    #             )
+    #     logger.warning("Imprimir tabla de resultados carrera")
+    #     im, carrera = crear_tabla_puntos(carrera_no_enviada.items[0])
+    #     texto = 'Resultados de la carrera: ' + carrera
+    #     with BytesIO() as tabla_puntos_imagen:    
+    #         im.save(tabla_puntos_imagen, "png")
+    #         tabla_puntos_imagen.seek(0)
+    #         await bot_quiniela.send_photo(
+    #             chat_id= float(controles['grupo']),
+    #             photo=tabla_puntos_imagen, 
+    #             caption=texto
+    #             )
             
-        logger.warning("Imprimir tabla general")
-        im, total_rondas = crear_tabla_general()
-        texto = "Total de rondas incluidas: " + str(total_rondas)
-        with BytesIO() as tablageneral_imagen:    
-            im.save(tablageneral_imagen, "png")
-            tablageneral_imagen.seek(0)
-            await bot_quiniela.send_photo(
-                chat_id= float(controles['grupo']),
-                photo=tablageneral_imagen, 
-                caption=texto
-                )
-        dbCarreras.update(updates={'Estado':'ARCHIVADA'}, key=carrera_no_enviada.items[0]['key'])
+    #     logger.warning("Imprimir tabla general")
+    #     im, total_rondas = crear_tabla_general()
+    #     texto = "Total de rondas incluidas: " + str(total_rondas)
+    #     with BytesIO() as tablageneral_imagen:    
+    #         im.save(tablageneral_imagen, "png")
+    #         tablageneral_imagen.seek(0)
+    #         await bot_quiniela.send_photo(
+    #             chat_id= float(controles['grupo']),
+    #             photo=tablageneral_imagen, 
+    #             caption=texto
+    #             )
+    #     dbCarreras.update(updates={'Estado':'ARCHIVADA'}, key=carrera_no_enviada.items[0]['key'])
         
-    encurso_siguiente_Carrera = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
-    if(encurso_siguiente_Carrera.count == 0):
-        response = requests.get(url=urlevent_tracker, headers=headerapi)
-        response.encoding = 'utf-8-sig'
-        response_dict = response.json()
-        carrera_codigo_eventtracker = dbCarreras.get(response_dict['fomRaceId'])
-        rondas_archivadas = dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'CANCELADA'}]).count
-        if(carrera_codigo_eventtracker is None):
-            carrera_codigo = response_dict['fomRaceId']
-            carrera_nombre = response_dict['race']['meetingOfficialName']
-            carrera_estado = response_dict['seasonContext']['state']
-            carrera_empiezo = response_dict['race']['meetingStartDate']
-            carrera_empiezo = carrera_empiezo.replace('Z', '+00:00')
-            carrera_termino = response_dict['race']['meetingEndDate']
-            carrera_termino = carrera_termino.replace('Z','+00:00')
+    # encurso_siguiente_Carrera = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    # if(encurso_siguiente_Carrera.count == 0):
+    #     response = requests.get(url=urlevent_tracker, headers=headerapi)
+    #     response.encoding = 'utf-8-sig'
+    #     response_dict = response.json()
+    #     carrera_codigo_eventtracker = dbCarreras.get(response_dict['fomRaceId'])
+    #     rondas_archivadas = dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'CANCELADA'}]).count
+    #     if(carrera_codigo_eventtracker is None):
+    #         carrera_codigo = response_dict['fomRaceId']
+    #         carrera_nombre = response_dict['race']['meetingOfficialName']
+    #         carrera_estado = response_dict['seasonContext']['state']
+    #         carrera_empiezo = response_dict['race']['meetingStartDate']
+    #         carrera_empiezo = carrera_empiezo.replace('Z', '+00:00')
+    #         carrera_termino = response_dict['race']['meetingEndDate']
+    #         carrera_termino = carrera_termino.replace('Z','+00:00')
             
-            carrera_dict = {}
-            carrera_dict['key'] = carrera_codigo
-            carrera_dict['Nombre'] = carrera_nombre
-            carrera_dict['Estado'] = carrera_estado
-            carrera_dict['Empiezo'] = carrera_empiezo
-            carrera_dict['Termino'] = carrera_termino
-            carrera_dict['Ronda'] = str(rondas_archivadas + 1)
-            for session in range(len(response_dict['seasonContext']['timetables'])):
-                session_row = response_dict['seasonContext']['timetables'][session]
-                carrera_dict[session_row['session']] = {
-                    'estado': session_row['state'],
-                    'hora_empiezo': session_row['startTime'] + session_row['gmtOffset'],
-                    'hora_termino': session_row['endTime'] + session_row['gmtOffset'],
-                }
-            dbCarreras.put(carrera_dict)
-    else:
-        estado_Carrera = encurso_siguiente_Carrera.items[0]['Estado']
-        if(estado_Carrera == 'IDLE'):
-            horaempiezo_Carrera = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Empiezo'])
-            horaempiezo_Carrera_utc = horaempiezo_Carrera.astimezone(utc)
-            if(hora_actual_utc > horaempiezo_Carrera_utc):
-                carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
-                dbCarreras.update(updates={'Estado':'EN-CURSO'}, key=carrera_codigo)
-        else:
-            horario_termino = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino'])
-            horario_termino_utc = horario_termino.astimezone(utc)
+    #         carrera_dict = {}
+    #         carrera_dict['key'] = carrera_codigo
+    #         carrera_dict['Nombre'] = carrera_nombre
+    #         carrera_dict['Estado'] = carrera_estado
+    #         carrera_dict['Empiezo'] = carrera_empiezo
+    #         carrera_dict['Termino'] = carrera_termino
+    #         carrera_dict['Ronda'] = str(rondas_archivadas + 1)
+    #         for session in range(len(response_dict['seasonContext']['timetables'])):
+    #             session_row = response_dict['seasonContext']['timetables'][session]
+    #             carrera_dict[session_row['session']] = {
+    #                 'estado': session_row['state'],
+    #                 'hora_empiezo': session_row['startTime'] + session_row['gmtOffset'],
+    #                 'hora_termino': session_row['endTime'] + session_row['gmtOffset'],
+    #             }
+    #         dbCarreras.put(carrera_dict)
+    # else:
+    #     estado_Carrera = encurso_siguiente_Carrera.items[0]['Estado']
+    #     if(estado_Carrera == 'IDLE'):
+    #         horaempiezo_Carrera = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Empiezo'])
+    #         horaempiezo_Carrera_utc = horaempiezo_Carrera.astimezone(utc)
+    #         if(hora_actual_utc > horaempiezo_Carrera_utc):
+    #             carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
+    #             dbCarreras.update(updates={'Estado':'EN-CURSO'}, key=carrera_codigo)
+    #     else:
+    #         horario_termino = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino'])
+    #         horario_termino_utc = horario_termino.astimezone(utc)
 
-            horario_q_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['q']['hora_empiezo'])
-            horario_q_sesion_utc = horario_q_sesion.astimezone(utc)
-            estado_qualy = encurso_siguiente_Carrera.items[0]['q']['estado']
+    #         horario_q_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['q']['hora_empiezo'])
+    #         horario_q_sesion_utc = horario_q_sesion.astimezone(utc)
+    #         estado_qualy = encurso_siguiente_Carrera.items[0]['q']['estado']
 
-            if hora_actual_utc >= horario_q_sesion_utc and estado_qualy == 'upcoming':
-                #mandar tabla quinielas
-                im, carrera_nombre, texto_estadisticas = crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
-                texto = "Quinielas para la carrera " + encurso_siguiente_Carrera.items[0]['Nombre']
-                with BytesIO() as tablaquinielaimagen:    
-                    im.save(tablaquinielaimagen, "png")
-                    tablaquinielaimagen.seek(0)
-                    await bot_quiniela.send_photo(
-                        chat_id= float(controles['grupo']),
-                        photo=tablaquinielaimagen, 
-                        caption=texto + '\n' + texto_estadisticas
-                        )
-                carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
-                cambiar_estado_qualy = encurso_siguiente_Carrera.items[0]['q']
-                cambiar_estado_qualy['estado'] = 'EMPEZADA'
-                dbCarreras.update(updates={'q':cambiar_estado_qualy}, key=carrera_codigo)
-            revisar_Pilotos = dbPilotos.fetch({'Carrera':encurso_siguiente_Carrera.items[0]['key']})
-            if(revisar_Pilotos.count == 0):
-                response = requests.get(url=urlevent_tracker, headers=headerapi)
-                response.encoding = 'utf-8-sig'
-                response_dict = response.json()
-                if('sessionLinkSets' in response_dict):
-                    sesion_carrera = response_dict['sessionLinkSets']['replayLinks'][0]['session']
-                    urllivetiming = response_dict['sessionLinkSets']['replayLinks'][0]['url']
-                    driverslist = 'DriverList.json'
-                    response = requests.get(url=urllivetiming + driverslist)
-                    response.encoding = 'utf-8-sig'
-                    response_dict = response.json()
-                    dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
-                    for id in response_dict:
-                        piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
-                        if(piloto.count == 0):
-                            record_pilotos = dbPilotos.get('2023')      
-                            listapilotos = record_pilotos['Lista']
-                            listapilotos[response_dict[id]['RacingNumber']] = {
-                                'codigo':response_dict[id]['Tla'],
-                                'Nombre':response_dict[id]['FirstName'],
-                                'Apellido':response_dict[id]['LastName'],
-                                'Equipo':response_dict[id]['TeamName'],
-                                'AcumuladoPuntos':0
-                            }
-                            dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
-            else:    
-                horario_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0][revisar_Pilotos.items[0]['Sesion']]['hora_termino']) 
-                horario_siguiente_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino']) 
-                for sesion in encurso_siguiente_Carrera.items[0]:
-                    if(isinstance(encurso_siguiente_Carrera.items[0][sesion], dict)):
-                        horario_sesion_comparar = datetime.fromisoformat(encurso_siguiente_Carrera.items[0][sesion]['hora_termino'])
-                        if(horario_sesion_comparar > horario_sesion):
-                            if(horario_sesion_comparar < horario_siguiente_sesion):
-                                horario_siguiente_sesion = horario_sesion_comparar
-                horario_siguiente_sesion_utc = horario_siguiente_sesion.astimezone(utc)
-                if(hora_actual_utc > horario_siguiente_sesion_utc):
-                    # si el horario actual es mayor al de la siguiente session                     
-                    response = requests.get(url=urlevent_tracker, headers=headerapi)
-                    response.encoding = 'utf-8-sig'
-                    response_dict = response.json()
+    #         if hora_actual_utc >= horario_q_sesion_utc and estado_qualy == 'upcoming':
+    #             #mandar tabla quinielas
+    #             im, carrera_nombre, texto_estadisticas = crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
+    #             texto = "Quinielas para la carrera " + encurso_siguiente_Carrera.items[0]['Nombre']
+    #             with BytesIO() as tablaquinielaimagen:    
+    #                 im.save(tablaquinielaimagen, "png")
+    #                 tablaquinielaimagen.seek(0)
+    #                 await bot_quiniela.send_photo(
+    #                     chat_id= float(controles['grupo']),
+    #                     photo=tablaquinielaimagen, 
+    #                     caption=texto + '\n' + texto_estadisticas
+    #                     )
+    #             carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
+    #             cambiar_estado_qualy = encurso_siguiente_Carrera.items[0]['q']
+    #             cambiar_estado_qualy['estado'] = 'EMPEZADA'
+    #             dbCarreras.update(updates={'q':cambiar_estado_qualy}, key=carrera_codigo)
+    #         revisar_Pilotos = dbPilotos.fetch({'Carrera':encurso_siguiente_Carrera.items[0]['key']})
+    #         if(revisar_Pilotos.count == 0):
+    #             response = requests.get(url=urlevent_tracker, headers=headerapi)
+    #             response.encoding = 'utf-8-sig'
+    #             response_dict = response.json()
+    #             if('sessionLinkSets' in response_dict):
+    #                 sesion_carrera = response_dict['sessionLinkSets']['replayLinks'][0]['session']
+    #                 urllivetiming = response_dict['sessionLinkSets']['replayLinks'][0]['url']
+    #                 driverslist = 'DriverList.json'
+    #                 response = requests.get(url=urllivetiming + driverslist)
+    #                 response.encoding = 'utf-8-sig'
+    #                 response_dict = response.json()
+    #                 dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
+    #                 for id in response_dict:
+    #                     piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
+    #                     if(piloto.count == 0):
+    #                         record_pilotos = dbPilotos.get('2023')      
+    #                         listapilotos = record_pilotos['Lista']
+    #                         listapilotos[response_dict[id]['RacingNumber']] = {
+    #                             'codigo':response_dict[id]['Tla'],
+    #                             'Nombre':response_dict[id]['FirstName'],
+    #                             'Apellido':response_dict[id]['LastName'],
+    #                             'Equipo':response_dict[id]['TeamName'],
+    #                             'AcumuladoPuntos':0
+    #                         }
+    #                         dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
+    #         else:    
+    #             horario_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0][revisar_Pilotos.items[0]['Sesion']]['hora_termino']) 
+    #             horario_siguiente_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino']) 
+    #             for sesion in encurso_siguiente_Carrera.items[0]:
+    #                 if(isinstance(encurso_siguiente_Carrera.items[0][sesion], dict)):
+    #                     horario_sesion_comparar = datetime.fromisoformat(encurso_siguiente_Carrera.items[0][sesion]['hora_termino'])
+    #                     if(horario_sesion_comparar > horario_sesion):
+    #                         if(horario_sesion_comparar < horario_siguiente_sesion):
+    #                             horario_siguiente_sesion = horario_sesion_comparar
+    #             horario_siguiente_sesion_utc = horario_siguiente_sesion.astimezone(utc)
+    #             if(hora_actual_utc > horario_siguiente_sesion_utc):
+    #                 # si el horario actual es mayor al de la siguiente session                     
+    #                 response = requests.get(url=urlevent_tracker, headers=headerapi)
+    #                 response.encoding = 'utf-8-sig'
+    #                 response_dict = response.json()
                     
-                    if('sessionLinkSets' in response_dict):
-                        index_sesion = len(response_dict['sessionLinkSets']['replayLinks']) - 1
-                        sesion_carrera = response_dict['sessionLinkSets']['replayLinks'][index_sesion]['session']
-                        urllivetiming = response_dict['sessionLinkSets']['replayLinks'][index_sesion]['url']
+    #                 if('sessionLinkSets' in response_dict):
+    #                     index_sesion = len(response_dict['sessionLinkSets']['replayLinks']) - 1
+    #                     sesion_carrera = response_dict['sessionLinkSets']['replayLinks'][index_sesion]['session']
+    #                     urllivetiming = response_dict['sessionLinkSets']['replayLinks'][index_sesion]['url']
                         
-                        driverslist = 'DriverList.json'
-                        response = requests.get(url=urllivetiming + driverslist)
-                        response.encoding = 'utf-8-sig'
-                        response_dict = response.json()
-                        dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
-                        for id in response_dict:
-                            piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
-                            if(piloto.count == 0):
-                                record_pilotos = dbPilotos.get('2023')      
-                                listapilotos = record_pilotos['Lista']
-                                listapilotos[response_dict[id]['RacingNumber']] = {
-                                    'codigo':response_dict[id]['Tla'],
-                                    'Nombre':response_dict[id]['FirstName'],
-                                    'Apellido':response_dict[id]['LastName'],
-                                    'Equipo':response_dict[id]['TeamName'],
-                                    'AcumuladoPuntos':0
-                                }
-                                dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
-                        # if(sesion_carrera == 'r'):                            
-            if hora_actual_utc > horario_termino_utc:
-                response = requests.get(url=urlevent_tracker, headers=headerapi)
-                response.encoding = 'utf-8-sig'
-                response_dict = response.json()
-                # contenido_nuevo += hora_actual_utc.isoformat() + ' Respuesta de la API ' + str(response_dict) + '\n'
-                links = []
-                if('links' in response_dict):
-                    links = response_dict['links']                                
-                    url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
-                    if(not(url_results_index is None)):
+    #                     driverslist = 'DriverList.json'
+    #                     response = requests.get(url=urllivetiming + driverslist)
+    #                     response.encoding = 'utf-8-sig'
+    #                     response_dict = response.json()
+    #                     dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
+    #                     for id in response_dict:
+    #                         piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
+    #                         if(piloto.count == 0):
+    #                             record_pilotos = dbPilotos.get('2023')      
+    #                             listapilotos = record_pilotos['Lista']
+    #                             listapilotos[response_dict[id]['RacingNumber']] = {
+    #                                 'codigo':response_dict[id]['Tla'],
+    #                                 'Nombre':response_dict[id]['FirstName'],
+    #                                 'Apellido':response_dict[id]['LastName'],
+    #                                 'Equipo':response_dict[id]['TeamName'],
+    #                                 'AcumuladoPuntos':0
+    #                             }
+    #                             dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
+    #                     # if(sesion_carrera == 'r'):                            
+    #         if hora_actual_utc > horario_termino_utc:
+    #             response = requests.get(url=urlevent_tracker, headers=headerapi)
+    #             response.encoding = 'utf-8-sig'
+    #             response_dict = response.json()
+    #             # contenido_nuevo += hora_actual_utc.isoformat() + ' Respuesta de la API ' + str(response_dict) + '\n'
+    #             links = []
+    #             if('links' in response_dict):
+    #                 links = response_dict['links']                                
+    #                 url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
+    #                 if(not(url_results_index is None)):
                         
-                        url_results = links[url_results_index]['url']
-                        soup = BeautifulSoup(requests.get(url_results).text)
-                        table = soup.find('table')
-                        # header = []
-                        rows = []
-                        for i, row in enumerate(table.find_all('tr')):
-                            if i == 0:
-                                header = [el.text.strip() for el in row.find_all('th')]
-                            else:
-                                rows.append([el.text.strip() for el in row.find_all('td')])
-                        posiciones_dict = {}
-                        for row in rows:
-                            if(row[1].isnumeric()):
-                                posicion = int(row[1])
-                                if(posicion < 11):
-                                    posiciones_dict[row[2]] = {
-                                        'posicion': posicion, 
-                                        'intervalo': row[6],
-                                        'puntos': int(row[7])
-                                        }
-                        datosquiniela = dbQuiniela.fetch()
-                        quinielas = datosquiniela.items
-                        dbPuntosPilotos.put({'key': encurso_siguiente_Carrera.items[0]['key'], 'Pilotos':posiciones_dict})
-                        for i_quiniela in range(len(quinielas)):
-                            quiniela = quinielas[i_quiniela]
-                            historico = dbHistorico.get(quiniela['key'])
-                            if historico is None:
-                                dbHistorico.put({
-                                    'key': quiniela['key'],
-                                    'Nombre': quiniela['Nombre'],
-                                    'Quinielas': {},
-                                    'Resultados': {}, 
-                                })
-                                historico = dbHistorico.get(quiniela['key'])
-                            historico_quinielas = historico['Quinielas']
-                            historico_quinielas[encurso_siguiente_Carrera.items[0]['key']] = quiniela
-                            historico_resultados = historico['Resultados']
-                            listaquiniela = quiniela['Lista'].split(',')
-                            if quiniela['Carrera'] != encurso_siguiente_Carrera.items[0]['key']:
-                                resultados = {'normales':0, 'extras':0, 'penalizaciones':-5}
-                            else:
-                                resultados = {'normales':0, 'extras':0, 'penalizaciones':0}
-                            pagosusuarios = dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},{'usuario':quiniela['key'], 'estado':'confirmado'} ])
-                            rondas_pagadas = 0
-                            rondas_confirmadas = 0
-                            for pagousuario in pagosusuarios.items:
-                                rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
-                                if pagousuario['estado'] == 'confirmado':
-                                    rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
-                            if rondas_pagadas < int(encurso_siguiente_Carrera.items[0]['Ronda']):
-                                resultados['penalizaciones'] = resultados['penalizaciones'] - 5
-                            # se termino revisar pagos
-                            for i_lista in range(len(listaquiniela)):
-                                piloto = listaquiniela[i_lista]
-                                piloto_fetch = dbPilotos.get('2023')
-                                numero_piloto = ''
-                                for n in piloto_fetch['Lista']:
-                                    if(piloto == piloto_fetch['Lista'][n]['codigo']):
-                                        numero_piloto = n
-                                if( numero_piloto in posiciones_dict):
-                                    resultados['normales'] = resultados['normales'] + posiciones_dict[numero_piloto]['puntos']
-                                    if(i_lista + 1 == posiciones_dict[numero_piloto]['posicion']):
-                                        resultados['extras'] = resultados['extras'] + 2
-                            historico_resultados[encurso_siguiente_Carrera.items[0]['key']] = resultados
-                            dbHistorico.update(updates={ 
-                                'Quinielas': historico_quinielas, 
-                                'Resultados': historico_resultados, 
-                                }, key=quiniela['key'])
+    #                     url_results = links[url_results_index]['url']
+    #                     soup = BeautifulSoup(requests.get(url_results).text)
+    #                     table = soup.find('table')
+    #                     # header = []
+    #                     rows = []
+    #                     for i, row in enumerate(table.find_all('tr')):
+    #                         if i == 0:
+    #                             header = [el.text.strip() for el in row.find_all('th')]
+    #                         else:
+    #                             rows.append([el.text.strip() for el in row.find_all('td')])
+    #                     posiciones_dict = {}
+    #                     for row in rows:
+    #                         if(row[1].isnumeric()):
+    #                             posicion = int(row[1])
+    #                             if(posicion < 11):
+    #                                 posiciones_dict[row[2]] = {
+    #                                     'posicion': posicion, 
+    #                                     'intervalo': row[6],
+    #                                     'puntos': int(row[7])
+    #                                     }
+    #                     datosquiniela = dbQuiniela.fetch()
+    #                     quinielas = datosquiniela.items
+    #                     dbPuntosPilotos.put({'key': encurso_siguiente_Carrera.items[0]['key'], 'Pilotos':posiciones_dict})
+    #                     for i_quiniela in range(len(quinielas)):
+    #                         quiniela = quinielas[i_quiniela]
+    #                         historico = dbHistorico.get(quiniela['key'])
+    #                         if historico is None:
+    #                             dbHistorico.put({
+    #                                 'key': quiniela['key'],
+    #                                 'Nombre': quiniela['Nombre'],
+    #                                 'Quinielas': {},
+    #                                 'Resultados': {}, 
+    #                             })
+    #                             historico = dbHistorico.get(quiniela['key'])
+    #                         historico_quinielas = historico['Quinielas']
+    #                         historico_quinielas[encurso_siguiente_Carrera.items[0]['key']] = quiniela
+    #                         historico_resultados = historico['Resultados']
+    #                         listaquiniela = quiniela['Lista'].split(',')
+    #                         if quiniela['Carrera'] != encurso_siguiente_Carrera.items[0]['key']:
+    #                             resultados = {'normales':0, 'extras':0, 'penalizaciones':-5}
+    #                         else:
+    #                             resultados = {'normales':0, 'extras':0, 'penalizaciones':0}
+    #                         pagosusuarios = dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},{'usuario':quiniela['key'], 'estado':'confirmado'} ])
+    #                         rondas_pagadas = 0
+    #                         rondas_confirmadas = 0
+    #                         for pagousuario in pagosusuarios.items:
+    #                             # rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
+    #                             # if pagousuario['estado'] == 'confirmado':
+    #                             #     rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
+    #                             if str(pagousuario['carreras']) == 'Todas':
+    #                                 rondas_pagadas = int(controles['rondas'])
+    #                             else:
+    #                                 rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
+    #                             if pagousuario['estado'] == 'confirmado':
+    #                                 if pagousuario['carreras'] == 'Todas':
+    #                                     rondas_confirmadas = int(controles['rondas'])
+    #                                 else:
+    #                                     rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
+    #                         logger.info('valores: ' + quiniela['key'] + str(rondas_pagadas))
+    #                         if rondas_pagadas < int(encurso_siguiente_Carrera.items[0]['Ronda']):
+    #                             resultados['penalizaciones'] = resultados['penalizaciones'] - 5
+    #                         # se termino revisar pagos
+    #                         for i_lista in range(len(listaquiniela)):
+    #                             piloto = listaquiniela[i_lista]
+    #                             piloto_fetch = dbPilotos.get('2023')
+    #                             numero_piloto = ''
+    #                             for n in piloto_fetch['Lista']:
+    #                                 if(piloto == piloto_fetch['Lista'][n]['codigo']):
+    #                                     numero_piloto = n
+    #                             if( numero_piloto in posiciones_dict):
+    #                                 resultados['normales'] = resultados['normales'] + posiciones_dict[numero_piloto]['puntos']
+    #                                 if(i_lista + 1 == posiciones_dict[numero_piloto]['posicion']):
+    #                                     resultados['extras'] = resultados['extras'] + 2
+    #                         historico_resultados[encurso_siguiente_Carrera.items[0]['key']] = resultados
+    #                         dbHistorico.update(updates={ 
+    #                             'Quinielas': historico_quinielas, 
+    #                             'Resultados': historico_resultados, 
+    #                             }, key=quiniela['key'])
                         
-                        dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
-                        await bot_quiniela.send_message(
-                            chat_id= float(controles['grupo']), 
-                            text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
-                            )
-                        logger.warning('Llego hasta el final del codigo')
-    pagos_por_enviar = dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
-    if pagos_por_enviar.count > 0:
-        for pago in pagos_por_enviar.items:
-            texto = 'Este pago ya fue ' + pago['estado']+ ' por el tesorero.'
-            await bot_quiniela.send_message(
-                float(pago['usuario']), 
-                text=texto,
-                reply_to_message_id=pago['mensaje']
-            )
-            dbPagos.update(updates={'enviado':True}, key=pago['key'])
-    return
+    #                     dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
+    #                     await bot_quiniela.send_message(
+    #                         chat_id= float(controles['grupo']), 
+    #                         text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
+    #                         )
+    #                     logger.warning('Llego hasta el final del codigo')
+    # pagos_por_enviar = dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
+    # if pagos_por_enviar.count > 0:
+    #     for pago in pagos_por_enviar.items:
+    #         texto = 'Este pago ya fue ' + pago['estado']+ ' por el tesorero.'
+    #         await bot_quiniela.send_message(
+    #             float(pago['usuario']), 
+    #             text=texto,
+    #             reply_to_message_id=pago['mensaje']
+    #         )
+    #         dbPagos.update(updates={'enviado':True}, key=pago['key'])
+    # return
 
 controles = dbConfiguracion.get('controles')
 
@@ -1252,9 +1262,9 @@ async def main() -> None:
     application.add_handler(conv_teclado)
 
     # Pass webhook settings to telegram
-    await application.bot.delete_webhook()
-    sleep(3)
-    await application.bot.set_webhook(url=f"{url}/telegram", allowed_updates=Update.ALL_TYPES)
+    # await application.bot.delete_webhook()
+    # sleep(3)
+    # await application.bot.set_webhook(url=f"{url}/telegram", allowed_updates=Update.ALL_TYPES)
     await application.bot.set_my_commands(
         [
             BotCommand("start", "empezar el bot"),
@@ -1306,7 +1316,292 @@ async def main() -> None:
         event = data['event']
         if event['id'] == 'actualizartablas':
             logger.info("Entro a actualizar tablas")
-            await actualizar_tablas()
+            bot_quiniela = Bot(BOT_TOKEN)
+            F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
+            urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
+            headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
+            urllivetiming = 'https://livetiming.formula1.com/static/'
+            controles = dbConfiguracion.get('controles')
+            
+            utc = pytz.utc
+            hora_actual = datetime.now()
+            hora_actual = hora_actual.astimezone()
+            hora_actual_utc = hora_actual.astimezone(utc)
+
+            logger.warning("Comenzo el proceso de actualizar tablas")
+
+            carrera_no_enviada = dbCarreras.fetch([{'Estado':'NO_ENVIADA'}])
+            if carrera_no_enviada.count > 0:
+                logger.warning("Imprimir tabla de resultados")
+                im, texto = crear_tabla_resultados()
+                with BytesIO() as tablaresutados_imagen:    
+                    im.save(tablaresutados_imagen, "png")
+                    tablaresutados_imagen.seek(0)
+                    await bot_quiniela.send_photo(
+                        chat_id= float(controles['grupo']),
+                        photo=tablaresutados_imagen, 
+                        caption=texto
+                        )
+                logger.warning("Imprimir tabla de resultados carrera")
+                im, carrera = crear_tabla_puntos(carrera_no_enviada.items[0])
+                texto = 'Resultados de la carrera: ' + carrera
+                with BytesIO() as tabla_puntos_imagen:    
+                    im.save(tabla_puntos_imagen, "png")
+                    tabla_puntos_imagen.seek(0)
+                    await bot_quiniela.send_photo(
+                        chat_id= float(controles['grupo']),
+                        photo=tabla_puntos_imagen, 
+                        caption=texto
+                        )
+                    
+                logger.warning("Imprimir tabla general")
+                im, total_rondas = crear_tabla_general()
+                texto = "Total de rondas incluidas: " + str(total_rondas)
+                with BytesIO() as tablageneral_imagen:    
+                    im.save(tablageneral_imagen, "png")
+                    tablageneral_imagen.seek(0)
+                    await bot_quiniela.send_photo(
+                        chat_id= float(controles['grupo']),
+                        photo=tablageneral_imagen, 
+                        caption=texto
+                        )
+                dbCarreras.update(updates={'Estado':'ARCHIVADA'}, key=carrera_no_enviada.items[0]['key'])
+                
+            encurso_siguiente_Carrera = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+            if(encurso_siguiente_Carrera.count == 0):
+                response = requests.get(url=urlevent_tracker, headers=headerapi)
+                response.encoding = 'utf-8-sig'
+                response_dict = response.json()
+                carrera_codigo_eventtracker = dbCarreras.get(response_dict['fomRaceId'])
+                rondas_archivadas = dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'CANCELADA'}]).count
+                if(carrera_codigo_eventtracker is None):
+                    carrera_codigo = response_dict['fomRaceId']
+                    carrera_nombre = response_dict['race']['meetingOfficialName']
+                    carrera_estado = response_dict['seasonContext']['state']
+                    carrera_empiezo = response_dict['race']['meetingStartDate']
+                    carrera_empiezo = carrera_empiezo.replace('Z', '+00:00')
+                    carrera_termino = response_dict['race']['meetingEndDate']
+                    carrera_termino = carrera_termino.replace('Z','+00:00')
+                    
+                    carrera_dict = {}
+                    carrera_dict['key'] = carrera_codigo
+                    carrera_dict['Nombre'] = carrera_nombre
+                    carrera_dict['Estado'] = carrera_estado
+                    carrera_dict['Empiezo'] = carrera_empiezo
+                    carrera_dict['Termino'] = carrera_termino
+                    carrera_dict['Ronda'] = str(rondas_archivadas + 1)
+                    for session in range(len(response_dict['seasonContext']['timetables'])):
+                        session_row = response_dict['seasonContext']['timetables'][session]
+                        carrera_dict[session_row['session']] = {
+                            'estado': session_row['state'],
+                            'hora_empiezo': session_row['startTime'] + session_row['gmtOffset'],
+                            'hora_termino': session_row['endTime'] + session_row['gmtOffset'],
+                        }
+                    dbCarreras.put(carrera_dict)
+            else:
+                estado_Carrera = encurso_siguiente_Carrera.items[0]['Estado']
+                if(estado_Carrera == 'IDLE'):
+                    horaempiezo_Carrera = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Empiezo'])
+                    horaempiezo_Carrera_utc = horaempiezo_Carrera.astimezone(utc)
+                    if(hora_actual_utc > horaempiezo_Carrera_utc):
+                        carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
+                        dbCarreras.update(updates={'Estado':'EN-CURSO'}, key=carrera_codigo)
+                else:
+                    horario_termino = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino'])
+                    horario_termino_utc = horario_termino.astimezone(utc)
+
+                    horario_q_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['q']['hora_empiezo'])
+                    horario_q_sesion_utc = horario_q_sesion.astimezone(utc)
+                    estado_qualy = encurso_siguiente_Carrera.items[0]['q']['estado']
+
+                    if hora_actual_utc >= horario_q_sesion_utc and estado_qualy == 'upcoming':
+                        #mandar tabla quinielas
+                        im, carrera_nombre, texto_estadisticas = crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
+                        texto = "Quinielas para la carrera " + encurso_siguiente_Carrera.items[0]['Nombre']
+                        with BytesIO() as tablaquinielaimagen:    
+                            im.save(tablaquinielaimagen, "png")
+                            tablaquinielaimagen.seek(0)
+                            await bot_quiniela.send_photo(
+                                chat_id= float(controles['grupo']),
+                                photo=tablaquinielaimagen, 
+                                caption=texto + '\n' + texto_estadisticas
+                                )
+                        carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
+                        cambiar_estado_qualy = encurso_siguiente_Carrera.items[0]['q']
+                        cambiar_estado_qualy['estado'] = 'EMPEZADA'
+                        dbCarreras.update(updates={'q':cambiar_estado_qualy}, key=carrera_codigo)
+                    revisar_Pilotos = dbPilotos.fetch({'Carrera':encurso_siguiente_Carrera.items[0]['key']})
+                    # if(revisar_Pilotos.count == 0):
+                    #     response = requests.get(url=urlevent_tracker, headers=headerapi)
+                    #     response.encoding = 'utf-8-sig'
+                    #     response_dict = response.json()
+                    #     if('sessionLinkSets' in response_dict):
+                    #         sesion_carrera = response_dict['sessionLinkSets']['replayLinks'][0]['session']
+                    #         urllivetiming = response_dict['sessionLinkSets']['replayLinks'][0]['url']
+                    #         driverslist = 'DriverList.json'
+                    #         response = requests.get(url=urllivetiming + driverslist)
+                    #         response.encoding = 'utf-8-sig'
+                    #         response_dict = response.json()
+                    #         dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
+                    #         for id in response_dict:
+                    #             piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
+                    #             if(piloto.count == 0):
+                    #                 record_pilotos = dbPilotos.get('2023')      
+                    #                 listapilotos = record_pilotos['Lista']
+                    #                 listapilotos[response_dict[id]['RacingNumber']] = {
+                    #                     'codigo':response_dict[id]['Tla'],
+                    #                     'Nombre':response_dict[id]['FirstName'],
+                    #                     'Apellido':response_dict[id]['LastName'],
+                    #                     'Equipo':response_dict[id]['TeamName'],
+                    #                     'AcumuladoPuntos':0
+                    #                 }
+                    #                 dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
+                    # else:    
+                        # horario_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0][revisar_Pilotos.items[0]['Sesion']]['hora_termino']) 
+                        # horario_siguiente_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino']) 
+                        # for sesion in encurso_siguiente_Carrera.items[0]:
+                        #     if(isinstance(encurso_siguiente_Carrera.items[0][sesion], dict)):
+                        #         horario_sesion_comparar = datetime.fromisoformat(encurso_siguiente_Carrera.items[0][sesion]['hora_termino'])
+                        #         if(horario_sesion_comparar > horario_sesion):
+                        #             if(horario_sesion_comparar < horario_siguiente_sesion):
+                        #                 horario_siguiente_sesion = horario_sesion_comparar
+                        # horario_siguiente_sesion_utc = horario_siguiente_sesion.astimezone(utc)
+                        # if(hora_actual_utc > horario_siguiente_sesion_utc):
+                        #     # si el horario actual es mayor al de la siguiente session                     
+                        #     response = requests.get(url=urlevent_tracker, headers=headerapi)
+                        #     response.encoding = 'utf-8-sig'
+                        #     response_dict = response.json()
+                            
+                        #     if('sessionLinkSets' in response_dict):
+                        #         index_sesion = len(response_dict['sessionLinkSets']['replayLinks']) - 1
+                        #         sesion_carrera = response_dict['sessionLinkSets']['replayLinks'][index_sesion]['session']
+                        #         urllivetiming = response_dict['sessionLinkSets']['replayLinks'][index_sesion]['url']
+                                
+                        #         driverslist = 'DriverList.json'
+                        #         response = requests.get(url=urllivetiming + driverslist)
+                        #         response.encoding = 'utf-8-sig'
+                        #         response_dict = response.json()
+                        #         dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
+                        #         for id in response_dict:
+                        #             piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
+                        #             if(piloto.count == 0):
+                        #                 record_pilotos = dbPilotos.get('2023')      
+                        #                 listapilotos = record_pilotos['Lista']
+                        #                 listapilotos[response_dict[id]['RacingNumber']] = {
+                        #                     'codigo':response_dict[id]['Tla'],
+                        #                     'Nombre':response_dict[id]['FirstName'],
+                        #                     'Apellido':response_dict[id]['LastName'],
+                        #                     'Equipo':response_dict[id]['TeamName'],
+                        #                     'AcumuladoPuntos':0
+                        #                 }
+                        #                 dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
+                        #         # if(sesion_carrera == 'r'):                            
+                    if hora_actual_utc > horario_termino_utc:
+                        response = requests.get(url=urlevent_tracker, headers=headerapi)
+                        response.encoding = 'utf-8-sig'
+                        response_dict = response.json()
+                        # contenido_nuevo += hora_actual_utc.isoformat() + ' Respuesta de la API ' + str(response_dict) + '\n'
+                        links = []
+                        if('links' in response_dict):
+                            links = response_dict['links']                                
+                            url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
+                            if(not(url_results_index is None)):
+                                
+                                url_results = links[url_results_index]['url']
+                                soup = BeautifulSoup(requests.get(url_results).text)
+                                table = soup.find('table')
+                                # header = []
+                                rows = []
+                                for i, row in enumerate(table.find_all('tr')):
+                                    if i == 0:
+                                        header = [el.text.strip() for el in row.find_all('th')]
+                                    else:
+                                        rows.append([el.text.strip() for el in row.find_all('td')])
+                                posiciones_dict = {}
+                                for row in rows:
+                                    if(row[1].isnumeric()):
+                                        posicion = int(row[1])
+                                        if(posicion < 11):
+                                            posiciones_dict[row[2]] = {
+                                                'posicion': posicion, 
+                                                'intervalo': row[6],
+                                                'puntos': int(row[7])
+                                                }
+                                datosquiniela = dbQuiniela.fetch()
+                                quinielas = datosquiniela.items
+                                dbPuntosPilotos.put({'key': encurso_siguiente_Carrera.items[0]['key'], 'Pilotos':posiciones_dict})
+                                for i_quiniela in range(len(quinielas)):
+                                    quiniela = quinielas[i_quiniela]
+                                    historico = dbHistorico.get(quiniela['key'])
+                                    if historico is None:
+                                        dbHistorico.put({
+                                            'key': quiniela['key'],
+                                            'Nombre': quiniela['Nombre'],
+                                            'Quinielas': {},
+                                            'Resultados': {}, 
+                                        })
+                                        historico = dbHistorico.get(quiniela['key'])
+                                    historico_quinielas = historico['Quinielas']
+                                    historico_quinielas[encurso_siguiente_Carrera.items[0]['key']] = quiniela
+                                    historico_resultados = historico['Resultados']
+                                    listaquiniela = quiniela['Lista'].split(',')
+                                    if quiniela['Carrera'] != encurso_siguiente_Carrera.items[0]['key']:
+                                        resultados = {'normales':0, 'extras':0, 'penalizaciones':-5}
+                                    else:
+                                        resultados = {'normales':0, 'extras':0, 'penalizaciones':0}
+                                    pagosusuarios = dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},{'usuario':quiniela['key'], 'estado':'confirmado'} ])
+                                    rondas_pagadas = 0
+                                    rondas_confirmadas = 0
+                                    for pagousuario in pagosusuarios.items:
+                                        # rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
+                                        # if pagousuario['estado'] == 'confirmado':
+                                        #     rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
+                                        if str(pagousuario['carreras']) == 'Todas':
+                                            rondas_pagadas = int(controles['rondas'])
+                                        else:
+                                            rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
+                                        if pagousuario['estado'] == 'confirmado':
+                                            if pagousuario['carreras'] == 'Todas':
+                                                rondas_confirmadas = int(controles['rondas'])
+                                            else:
+                                                rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
+                                    logger.info('valores: ' + quiniela['key'] + str(rondas_pagadas))
+                                    if rondas_pagadas < int(encurso_siguiente_Carrera.items[0]['Ronda']):
+                                        resultados['penalizaciones'] = resultados['penalizaciones'] - 5
+                                    # se termino revisar pagos
+                                    for i_lista in range(len(listaquiniela)):
+                                        piloto = listaquiniela[i_lista]
+                                        piloto_fetch = dbPilotos.get('2023')
+                                        numero_piloto = ''
+                                        for n in piloto_fetch['Lista']:
+                                            if(piloto == piloto_fetch['Lista'][n]['codigo']):
+                                                numero_piloto = n
+                                        if( numero_piloto in posiciones_dict):
+                                            resultados['normales'] = resultados['normales'] + posiciones_dict[numero_piloto]['puntos']
+                                            if(i_lista + 1 == posiciones_dict[numero_piloto]['posicion']):
+                                                resultados['extras'] = resultados['extras'] + 2
+                                    historico_resultados[encurso_siguiente_Carrera.items[0]['key']] = resultados
+                                    dbHistorico.update(updates={ 
+                                        'Quinielas': historico_quinielas, 
+                                        'Resultados': historico_resultados, 
+                                        }, key=quiniela['key'])
+                                
+                                dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
+                                await bot_quiniela.send_message(
+                                    chat_id= float(controles['grupo']), 
+                                    text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
+                                    )
+                                logger.warning('Llego hasta el final del codigo')
+            pagos_por_enviar = dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
+            if pagos_por_enviar.count > 0:
+                for pago in pagos_por_enviar.items:
+                    texto = 'Este pago ya fue ' + pago['estado']+ ' por el tesorero.'
+                    await bot_quiniela.send_message(
+                        float(pago['usuario']), 
+                        text=texto,
+                        reply_to_message_id=pago['mensaje']
+                    )
+                    dbPagos.update(updates={'enviado':True}, key=pago['key'])
         return Response()
 
     starlette_app = Starlette(
@@ -1332,6 +1627,14 @@ async def main() -> None:
         await application.start()
         await webserver.serve()
         await application.stop()
+        # await dbPuntosPilotos.close()
+        # await dbCarreras.close()
+        # await dbfavoritos.close()
+        # await dbHistorico.close()
+        # await dbQuiniela.close()
+        # await dbPilotos.close()
+        # await dbPagos.close()
+        # await dbConfiguracion.close()
 
 
 if __name__ == "__main__":

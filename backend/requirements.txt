@@ -7,3 +7,5 @@ pytz
 requests
 beautifulsoup4
 uvicorn
+fastapi
+aiohttp
