@@ -1,18 +1,8 @@
 # Spacefile Docs: https://go.deta.dev/docs/spacefile/v0
 v: 0
 micros:
-  # - name: frontend
-  #   src: frontend
-  #   engine: static
-  #   serve: dist/
-  #   primary: true
-  #   # dev: npm run dev
-  #   public_routes:
-  #     - "/favoritos/"
-  #     - "/quiniela/"
-  - name: backend
-    src: backend
-    path: api
+  - name: BotQuiniela
+    src: telegramBot
     engine: python3.9
     dev: ./../.venv/bin/python3 main.py
     run: python3 main.py
@@ -22,10 +12,32 @@ micros:
           description: Telegram BOT Token
     public_routes:
       - "/telegram"
-      # - "/quinieladb"
+      - "/healthcheck"
+    primary: true  
+
+  - name: BaseDeDatos
+    src: dbQuiniela
+    engine: python3.9
+    path: basedatos
+    dev: ./../.venv/bin/uvicorn main:app --reload
+    run: uvicorn main:app
+    presets:
+      env:
+        - name: BOT_TOKEN
+          description: Telegram BOT Token
     actions:
       - id: "actualizartablas"
         name: "Actualizar Tablas"
         description: "Actualiza la tabla de pilotos y la de resultados"
+        trigger: "schedule"
+        default_interval: "0/5 * * * *"
+      - id: "revisarpagos"
+        name: "Revisar Pagos"
+        description: "Enviar mensajes de pagos confirmados"
+        trigger: "schedule"
+        default_interval: "1/5 * * * *"
+      - id: "healthcheckBot"
+        name: "Healthcheck del Bot"
+        description: "Asegurar que el bot de Telegram este activo"
         trigger: "schedule"
         default_interval: "0/5 * * * *"
