@@ -420,6 +420,7 @@ async def actualizar_tablas():
                             else:
                                 rows.append([el.text.strip() for el in row.find_all('td')])
                         posiciones_dict = {}
+                        pilotos_con_puntos = 0
                         for row in rows:
                             if(row[1].isnumeric()):
                                 posicion = int(row[1])
@@ -429,71 +430,74 @@ async def actualizar_tablas():
                                         'intervalo': row[6],
                                         'puntos': int(row[7])
                                         }
-                        datosquiniela = dbQuiniela.fetch()
-                        quinielas = datosquiniela.items
-                        dbPuntosPilotos.put({'key': encurso_siguiente_Carrera.items[0]['key'], 'Pilotos':posiciones_dict})
-                        for i_quiniela in range(len(quinielas)):
-                            quiniela = quinielas[i_quiniela]
-                            historico = dbHistorico.get(quiniela['key'])
-                            if historico is None:
-                                dbHistorico.put({
-                                    'key': quiniela['key'],
-                                    'Nombre': quiniela['Nombre'],
-                                    'Quinielas': {},
-                                    'Resultados': {}, 
-                                })
+                                    if int(row[7]) > 0:
+                                        pilotos_con_puntos = pilotos_con_puntos + 1
+                        if pilotos_con_puntos >= 10:
+                            datosquiniela = dbQuiniela.fetch()
+                            quinielas = datosquiniela.items
+                            dbPuntosPilotos.put({'key': encurso_siguiente_Carrera.items[0]['key'], 'Pilotos':posiciones_dict})
+                            for i_quiniela in range(len(quinielas)):
+                                quiniela = quinielas[i_quiniela]
                                 historico = dbHistorico.get(quiniela['key'])
-                            historico_quinielas = historico['Quinielas']
-                            historico_quinielas[encurso_siguiente_Carrera.items[0]['key']] = quiniela
-                            historico_resultados = historico['Resultados']
-                            listaquiniela = quiniela['Lista'].split(',')
-                            if quiniela['Carrera'] != encurso_siguiente_Carrera.items[0]['key']:
-                                resultados = {'normales':0, 'extras':0, 'penalizaciones':-5}
-                            else:
-                                resultados = {'normales':0, 'extras':0, 'penalizaciones':0}
-                            pagosusuarios = dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},{'usuario':quiniela['key'], 'estado':'confirmado'} ])
-                            rondas_pagadas = 0
-                            rondas_confirmadas = 0
-                            for pagousuario in pagosusuarios.items:
-                                # rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
-                                # if pagousuario['estado'] == 'confirmado':
-                                #     rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
-                                if str(pagousuario['carreras']) == 'Todas':
-                                    rondas_pagadas = int(controles['rondas'])
+                                if historico is None:
+                                    dbHistorico.put({
+                                        'key': quiniela['key'],
+                                        'Nombre': quiniela['Nombre'],
+                                        'Quinielas': {},
+                                        'Resultados': {}, 
+                                    })
+                                    historico = dbHistorico.get(quiniela['key'])
+                                historico_quinielas = historico['Quinielas']
+                                historico_quinielas[encurso_siguiente_Carrera.items[0]['key']] = quiniela
+                                historico_resultados = historico['Resultados']
+                                listaquiniela = quiniela['Lista'].split(',')
+                                if quiniela['Carrera'] != encurso_siguiente_Carrera.items[0]['key']:
+                                    resultados = {'normales':0, 'extras':0, 'penalizaciones':-5}
                                 else:
-                                    rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
-                                if pagousuario['estado'] == 'confirmado':
-                                    if pagousuario['carreras'] == 'Todas':
-                                        rondas_confirmadas = int(controles['rondas'])
+                                    resultados = {'normales':0, 'extras':0, 'penalizaciones':0}
+                                pagosusuarios = dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},{'usuario':quiniela['key'], 'estado':'confirmado'} ])
+                                rondas_pagadas = 0
+                                rondas_confirmadas = 0
+                                for pagousuario in pagosusuarios.items:
+                                    # rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
+                                    # if pagousuario['estado'] == 'confirmado':
+                                    #     rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
+                                    if str(pagousuario['carreras']) == 'Todas':
+                                        rondas_pagadas = int(controles['rondas'])
                                     else:
-                                        rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
-                            logger.info('valores: ' + quiniela['key'] + str(rondas_pagadas))
-                            if rondas_pagadas < int(encurso_siguiente_Carrera.items[0]['Ronda']):
-                                resultados['penalizaciones'] = resultados['penalizaciones'] - 5
-                            # se termino revisar pagos
-                            for i_lista in range(len(listaquiniela)):
-                                piloto = listaquiniela[i_lista]
-                                piloto_fetch = dbPilotos.get('2023')
-                                numero_piloto = ''
-                                for n in piloto_fetch['Lista']:
-                                    if(piloto == piloto_fetch['Lista'][n]['codigo']):
-                                        numero_piloto = n
-                                if( numero_piloto in posiciones_dict):
-                                    resultados['normales'] = resultados['normales'] + posiciones_dict[numero_piloto]['puntos']
-                                    if(i_lista + 1 == posiciones_dict[numero_piloto]['posicion']):
-                                        resultados['extras'] = resultados['extras'] + 2
-                            historico_resultados[encurso_siguiente_Carrera.items[0]['key']] = resultados
-                            dbHistorico.update(updates={ 
-                                'Quinielas': historico_quinielas, 
-                                'Resultados': historico_resultados, 
-                                }, key=quiniela['key'])
-                        
-                        dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
-                        await bot_quiniela.send_message(
-                            chat_id= float(controles['grupo']), 
-                            text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
-                            )
-                        logger.warning('Llego hasta el final del codigo')
+                                        rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
+                                    if pagousuario['estado'] == 'confirmado':
+                                        if pagousuario['carreras'] == 'Todas':
+                                            rondas_confirmadas = int(controles['rondas'])
+                                        else:
+                                            rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
+                                logger.info('valores: ' + quiniela['key'] + str(rondas_pagadas))
+                                if rondas_pagadas < int(encurso_siguiente_Carrera.items[0]['Ronda']):
+                                    resultados['penalizaciones'] = resultados['penalizaciones'] - 5
+                                # se termino revisar pagos
+                                for i_lista in range(len(listaquiniela)):
+                                    piloto = listaquiniela[i_lista]
+                                    piloto_fetch = dbPilotos.get('2023')
+                                    numero_piloto = ''
+                                    for n in piloto_fetch['Lista']:
+                                        if(piloto == piloto_fetch['Lista'][n]['codigo']):
+                                            numero_piloto = n
+                                    if( numero_piloto in posiciones_dict):
+                                        resultados['normales'] = resultados['normales'] + posiciones_dict[numero_piloto]['puntos']
+                                        if(i_lista + 1 == posiciones_dict[numero_piloto]['posicion']):
+                                            resultados['extras'] = resultados['extras'] + 2
+                                historico_resultados[encurso_siguiente_Carrera.items[0]['key']] = resultados
+                                dbHistorico.update(updates={ 
+                                    'Quinielas': historico_quinielas, 
+                                    'Resultados': historico_resultados, 
+                                    }, key=quiniela['key'])
+                            
+                            dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
+                            await bot_quiniela.send_message(
+                                chat_id= float(controles['grupo']), 
+                                text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
+                                )
+                            logger.warning('Llego hasta el final del codigo')
     return
 
 async def enviar_pagos():
