@@ -204,7 +204,7 @@ def crear_tabla_resultados():
     if puntos_ganador >= 90:
         texto_ganador = texto_ganador + ganador + '. Con un total de ' + str(puntos_ganador) + ' puntos.'
     else:
-        texto_ganador = 'No hubo ganador para la carrera: ' + carrera_nombre + '. Nadie logro hacer mas de 90 puntos. El premio se acumula para la /proxima carrera.'
+        texto_ganador = 'No hubo ganador para la carrera: ' + carrera_nombre + '. Nadie logro hacer 90 puntos o mas. El premio se acumula para la /proxima carrera.'
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
     letra = ImageFont.truetype("Menlo.ttc", 15)
