@@ -40,4 +40,4 @@ micros:
         name: "Healthcheck del Bot"
         description: "Asegurar que el bot de Telegram este activo"
         trigger: "schedule"
-        default_interval: "0/5 * * * *"
+        default_interval: "2/5 * * * *"

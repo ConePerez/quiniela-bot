@@ -65,6 +65,33 @@ meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
 controles = dbConfiguracion.get('controles')
 
+def obtener_resultados(url, carrera):
+    dbCarreras.update(updates={'url':url}, key=carrera)
+    soup = BeautifulSoup(requests.get(url).text)
+    table = soup.find('table')
+    # header = []
+    rows = []
+    for i, row in enumerate(table.find_all('tr')):
+        if i == 0:
+            header = [el.text.strip() for el in row.find_all('th')]
+        else:
+            rows.append([el.text.strip() for el in row.find_all('td')])
+    posiciones_dict = {}
+    pilotos_con_puntos = 0
+    for row in rows:
+        if(row[1].isnumeric()):
+            posicion = int(row[1])
+            if(posicion < 11):
+                posiciones_dict[row[2]] = {
+                    'posicion': posicion, 
+                    'intervalo': row[6],
+                    'puntos': int(row[7])
+                    }
+                if int(row[7]) > 0:
+                    pilotos_con_puntos = pilotos_con_puntos + 1
+    dbPuntosPilotos.put({'key': carrera, 'Pilotos':posiciones_dict})
+    return posiciones_dict, pilotos_con_puntos
+
 def crear_tabla_puntos(obj_carrera):
     tabla_puntos_piloto = PrettyTable()
     tabla_puntos_piloto.title = obj_carrera['Nombre']
@@ -408,34 +435,11 @@ async def actualizar_tablas():
                     links = response_dict['links']                                
                     url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
                     if(not(url_results_index is None)):
-                        
-                        url_results = links[url_results_index]['url']
-                        soup = BeautifulSoup(requests.get(url_results).text)
-                        table = soup.find('table')
-                        # header = []
-                        rows = []
-                        for i, row in enumerate(table.find_all('tr')):
-                            if i == 0:
-                                header = [el.text.strip() for el in row.find_all('th')]
-                            else:
-                                rows.append([el.text.strip() for el in row.find_all('td')])
-                        posiciones_dict = {}
-                        pilotos_con_puntos = 0
-                        for row in rows:
-                            if(row[1].isnumeric()):
-                                posicion = int(row[1])
-                                if(posicion < 11):
-                                    posiciones_dict[row[2]] = {
-                                        'posicion': posicion, 
-                                        'intervalo': row[6],
-                                        'puntos': int(row[7])
-                                        }
-                                    if int(row[7]) > 0:
-                                        pilotos_con_puntos = pilotos_con_puntos + 1
+                        url_results = links[url_results_index]['url']                        
+                        posiciones_dict, pilotos_con_puntos = obtener_resultados(url_results, encurso_siguiente_Carrera.items[0]['key'])
                         if pilotos_con_puntos >= 10:
                             datosquiniela = dbQuiniela.fetch()
-                            quinielas = datosquiniela.items
-                            dbPuntosPilotos.put({'key': encurso_siguiente_Carrera.items[0]['key'], 'Pilotos':posiciones_dict})
+                            quinielas = datosquiniela.items                            
                             for i_quiniela in range(len(quinielas)):
                                 quiniela = quinielas[i_quiniela]
                                 historico = dbHistorico.get(quiniela['key'])
@@ -471,7 +475,6 @@ async def actualizar_tablas():
                                             rondas_confirmadas = int(controles['rondas'])
                                         else:
                                             rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
-                                logger.info('valores: ' + quiniela['key'] + str(rondas_pagadas))
                                 if rondas_pagadas < int(encurso_siguiente_Carrera.items[0]['Ronda']):
                                     resultados['penalizaciones'] = resultados['penalizaciones'] - 5
                                 # se termino revisar pagos
@@ -497,7 +500,7 @@ async def actualizar_tablas():
                                 chat_id= float(controles['grupo']), 
                                 text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
                                 )
-                            logger.warning('Llego hasta el final del codigo')
+                            logger.warning('Llego hasta el final del codigo.')
     return
 
 async def enviar_pagos():
@@ -526,13 +529,13 @@ async def actions(req: Request):
     data = await req.json()   
     event = data['event']
     if event['id'] == 'actualizartablas':
-        logger.info("Entro a actualizar tablas")
+        logger.warning("Entro a actualizar tablas")
         await actualizar_tablas()
     if event['id'] == 'revisarpagos':
-        logger.info("Entro a revisar pagos")
+        logger.warning("Entro a revisar pagos")
         await enviar_pagos()
     if event['id'] == "healthcheckBot":
-        logger.info("Entro a healthcheck del bot")
+        logger.warning("Entro a healthcheck del bot")
         await healthcheck_bot()
     return Response()
 
