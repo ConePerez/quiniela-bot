@@ -39,7 +39,7 @@ from telegram import (
 
 # Enable logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.WARNING
 )
 # set higher logging level for httpx to avoid all GET and POST requests being logged
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -412,6 +412,7 @@ async def actualizar_tablas():
                     'hora_termino': session_row['endTime'] + session_row['gmtOffset'],
                 }
             dbCarreras.put(carrera_dict)
+            # mandar mensaje de proxima
     else:
         estado_Carrera = encurso_siguiente_Carrera.items[0]['Estado']
         if(estado_Carrera == 'IDLE'):
