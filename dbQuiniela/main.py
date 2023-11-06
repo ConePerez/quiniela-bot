@@ -51,19 +51,20 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 WEBHOOK_URL = 'https://' + os.getenv('DETA_SPACE_APP_HOSTNAME')
 PORT = int(os.getenv('PORT'))
 
-dbPuntosPilotos = deta.Base('PuntosPilotos')
-dbCarreras = deta.Base('Carreras')
-dbfavoritos = deta.Base("Favoritos")
-dbHistorico = deta.Base('Historico')
-dbQuiniela = deta.Base("Quiniela")
-dbPilotos = deta.Base("Pilotos")
-dbPagos = deta.Base('Pagos')
-dbConfiguracion= deta.Base('Configuracion')
+# dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
+# dbCarreras = deta.AsyncBase('Carreras')
+# dbHistorico = deta.AsyncBase('Historico')
+# dbQuiniela = deta.AsyncBase("Quiniela")
+# dbPilotos = deta.AsyncBase("Pilotos")
+# dbPagos = deta.AsyncBase('Pagos')
+# dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
+dbConfiguracion= deta.AsyncBase('Configuracion')
 
 dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre','dicembre']
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-controles = dbConfiguracion.get('controles')
+controles = await dbConfiguracion.get('controles')
+await dbConfiguracion.close()
 
 async def obtener_resultados(url, carrera):
     dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
@@ -131,6 +132,8 @@ async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
     dbPagos = deta.AsyncBase('Pagos')
     carrera = await dbCarreras.get(carrera_codigo)
     await dbCarreras.close()
+    piloto_fetch = await dbPilotos.get('2023')
+    await dbPilotos.close()
     historico_participantes = await dbHistorico.fetch()
     for historico_participante in historico_participantes.items:
         historico_quinielas = historico_participante['Quinielas']
@@ -159,7 +162,7 @@ async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
         # se termino revisar pagos
         for i_lista in range(len(listaquiniela)):
             piloto = listaquiniela[i_lista]
-            piloto_fetch = await dbPilotos.get('2023')
+            
             numero_piloto = ''
             for n in piloto_fetch['Lista']:
                 if(piloto == piloto_fetch['Lista'][n]['codigo']):
@@ -175,15 +178,20 @@ async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
             }, key=quiniela['key'])
     await dbHistorico.close()
     await dbPagos.close()
-    await dbPilotos.close()
+    
 
-def crear_tabla_puntos(obj_carrera):
+async def crear_tabla_puntos(obj_carrera):
+    dbPuntosPilotos = deta.AsyncBase("PuntosPilotos")
+    dbPilotos = deta.AsyncBase("Pilotos")
     tabla_puntos_piloto = PrettyTable()
     tabla_puntos_piloto.title = obj_carrera['Nombre']
     tabla_puntos_piloto.field_names = ["Pos", "Nombre", "Equipo", "Puntos", "Intervalo"]
     tabla_puntos_piloto.sortby = "Pos"
-    resultado_pilotos = dbPuntosPilotos.get(obj_carrera['key'])
-    detalles_piloto = dbPilotos.get('2023')['Lista']
+    resultado_pilotos = await dbPuntosPilotos.get(obj_carrera['key'])
+    await dbPuntosPilotos.close()
+    detalles_piloto = await dbPilotos.get('2023')
+    await dbPilotos.close()
+    detalles_piloto = detalles_piloto['Lista']
     for numero, resultado in resultado_pilotos['Pilotos'].items():
         tabla_puntos_piloto.add_row([resultado['posicion'], detalles_piloto[numero]['Nombre'] + ' ' + detalles_piloto[numero]['Apellido'], detalles_piloto[numero]['Equipo'], resultado['puntos'], resultado['intervalo']])
     im = Image.new("RGB", (200, 200), "white")
@@ -197,7 +205,7 @@ def crear_tabla_puntos(obj_carrera):
     dibujo.text((20, tablapilotostamano[3] + 20), "Resultados tomados de la pagina oficial de Formula 1", font=letraabajo, fill="black")
     return im, obj_carrera['Nombre']
 
-def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
+async def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     """Crear la tabla de las quinielas en una imagen."""
     carrera_nombre = carrera_en_curso['Nombre']
     carrera_clave = carrera_en_curso['key']
@@ -205,7 +213,8 @@ def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     tablaquiniela.title = carrera_nombre
     tablaquiniela.field_names = ["Fecha/hora", "Nombre", "P1", "P2", "P3", "P4", "P5", "P6", "P7",]
     tablaquiniela.sortby = "Fecha/hora"
-    datosquiniela = dbQuiniela.fetch({'Carrera':carrera_clave})
+    dbQuiniela = deta.AsyncBase('Quiniela')
+    datosquiniela = await dbQuiniela.fetch({'Carrera':carrera_clave})
     filas = datosquiniela.items    
     datos_posiciones = {'P1': [], 'P2': [], 'P3': [], 'P4': [], 'P5': [], 'P6': [], 'P7': []}        
     for index in range(datosquiniela.count):
@@ -237,17 +246,20 @@ def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     dibujo.text((10, 10), str(tablaquiniela), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
+    await dbQuiniela.close()
     return im, carrera_nombre, texto_estadisticas
 
-def crear_tabla_general():
+async def crear_tabla_general():
     tablaresultados = PrettyTable()
     tablaresultados.title = 'Tabla General Quiniela F1'
     tablaresultados.field_names = ["Nombre", "Puntos Totales", "Puntos Pilotos", "Puntos Extras", "Penalizaciones"]
     tablaresultados.sortby = "Puntos Totales"
     tablaresultados.reversesort = True
-
-    resultados_historicos = dbHistorico.fetch()
-    total_rondas = dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}]).count
+    dbHistorico = deta.AsyncBase('Historico')
+    dbCarreras = deta.AsyncBase('Carreras')
+    resultados_historicos = await dbHistorico.fetch()
+    total_rondas = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
+    total_rondas = total_rondas.count
     for usuario in resultados_historicos.items:
         normales = 0
         extras = 0
@@ -266,10 +278,14 @@ def crear_tabla_general():
     dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaresultados_tamano[3] + 20), "Total de rondas incluidas: " + str(total_rondas), font=letraabajo, fill="black")
+    await dbHistorico.close()
+    await dbCarreras.close()
     return im, total_rondas
 
-def crear_tabla_resultados():
-    carreras = dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
+async def crear_tabla_resultados():
+    dbCarreras = deta.AsyncBase('Carreras')
+    dbHistorico = deta.AsyncBase('Historico')
+    carreras = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
     maximo_horario = datetime.fromisoformat('2023-01-01T00:00:00.000+00:00')
     ultima_carrera_archivada = ''
     for carrera in carreras.items:
@@ -279,12 +295,12 @@ def crear_tabla_resultados():
             ultima_carrera_archivada = carrera['key']
     
     carrera_codigo = ultima_carrera_archivada
-    carrera_dict = dbCarreras.get(carrera_codigo)
+    carrera_dict = await dbCarreras.get(carrera_codigo)
     carrera_nombre = carrera_dict['Nombre']
     tablaresultados = PrettyTable()
     tablaresultados.title = carrera_nombre
     tablaresultados.field_names = ["Nombre", "Puntos Totales", "Puntos Pilotos", "Puntos Extras", "Penalizaciones"]
-    datosHistoricos = dbHistorico.fetch()
+    datosHistoricos = await dbHistorico.fetch()
     usuarios = datosHistoricos.items
     listaresultados = []
 
@@ -326,6 +342,8 @@ def crear_tabla_resultados():
     dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaresultados_tamano[3] + 20), "Los que tienen penalizaciones no pueden ganar el premio, estan en la segunda seccion de la tabla", font=letraabajo, fill="black")
+    await dbCarreras.close()
+    await dbHistorico.close()
     return im, texto_ganador
 
 
@@ -335,8 +353,9 @@ async def actualizar_tablas():
     urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
     headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
     urllivetiming = 'https://livetiming.formula1.com/static/'
-    controles = dbConfiguracion.get('controles')
-    
+    dbConfiguracion = deta.AsyncBase('Configuracion')
+    controles = await dbConfiguracion.get('controles')
+    await dbConfiguracion.close()
     utc = pytz.utc
     hora_actual = datetime.now()
     hora_actual = hora_actual.astimezone()
@@ -344,10 +363,11 @@ async def actualizar_tablas():
 
     logger.warning("Comenzo el proceso de actualizar tablas")
 
-    carrera_no_enviada = dbCarreras.fetch([{'Estado':'NO_ENVIADA'}])
+    dbCarreras = deta.AsyncBase('Carreras')
+    carrera_no_enviada = await dbCarreras.fetch([{'Estado':'NO_ENVIADA'}])
     if carrera_no_enviada.count > 0:
         logger.warning("Imprimir tabla de resultados")
-        im, texto = crear_tabla_resultados()
+        im, texto = await crear_tabla_resultados()
         with BytesIO() as tablaresutados_imagen:    
             im.save(tablaresutados_imagen, "png")
             tablaresutados_imagen.seek(0)
@@ -357,7 +377,7 @@ async def actualizar_tablas():
                 caption=texto
                 )
         logger.warning("Imprimir tabla de resultados carrera")
-        im, carrera = crear_tabla_puntos(carrera_no_enviada.items[0])
+        im, carrera = await crear_tabla_puntos(carrera_no_enviada.items[0])
         texto = 'Resultados de la carrera: ' + carrera
         with BytesIO() as tabla_puntos_imagen:    
             im.save(tabla_puntos_imagen, "png")
@@ -369,7 +389,7 @@ async def actualizar_tablas():
                 )
             
         logger.warning("Imprimir tabla general")
-        im, total_rondas = crear_tabla_general()
+        im, total_rondas = await crear_tabla_general()
         texto = "Total de rondas incluidas: " + str(total_rondas)
         with BytesIO() as tablageneral_imagen:    
             im.save(tablageneral_imagen, "png")
@@ -379,15 +399,18 @@ async def actualizar_tablas():
                 photo=tablageneral_imagen, 
                 caption=texto
                 )
-        dbCarreras.update(updates={'Estado':'ARCHIVADA'}, key=carrera_no_enviada.items[0]['key'])
-        
-    encurso_siguiente_Carrera = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+        await dbCarreras.update(updates={'Estado':'ARCHIVADA'}, key=carrera_no_enviada.items[0]['key'])
+    await dbCarreras.close()
+
+    dbCarreras = deta.AsyncBase('Carreras')
+    encurso_siguiente_Carrera = await dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     if(encurso_siguiente_Carrera.count == 0):
         response = requests.get(url=urlevent_tracker, headers=headerapi)
         response.encoding = 'utf-8-sig'
         response_dict = response.json()
-        carrera_codigo_eventtracker = dbCarreras.get(response_dict['fomRaceId'])
-        rondas_archivadas = dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'CANCELADA'}]).count
+        carrera_codigo_eventtracker = await dbCarreras.get(response_dict['fomRaceId'])
+        rondas_archivadas = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'CANCELADA'}])
+        rondas_archivadas = rondas_archivadas.count
         if(carrera_codigo_eventtracker is None):
             carrera_codigo = response_dict['fomRaceId']
             carrera_nombre = response_dict['race']['meetingOfficialName']
@@ -411,7 +434,7 @@ async def actualizar_tablas():
                     'hora_empiezo': session_row['startTime'] + session_row['gmtOffset'],
                     'hora_termino': session_row['endTime'] + session_row['gmtOffset'],
                 }
-            dbCarreras.put(carrera_dict)
+            await dbCarreras.put(carrera_dict)
             # mandar mensaje de proxima
     else:
         estado_Carrera = encurso_siguiente_Carrera.items[0]['Estado']
@@ -420,7 +443,7 @@ async def actualizar_tablas():
             horaempiezo_Carrera_utc = horaempiezo_Carrera.astimezone(utc)
             if(hora_actual_utc > horaempiezo_Carrera_utc):
                 carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
-                dbCarreras.update(updates={'Estado':'EN-CURSO'}, key=carrera_codigo)
+                await dbCarreras.update(updates={'Estado':'EN-CURSO'}, key=carrera_codigo)
         else:
             horario_termino = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino'])
             horario_termino_utc = horario_termino.astimezone(utc)
@@ -432,7 +455,7 @@ async def actualizar_tablas():
             if hora_actual_utc >= horario_q_sesion_utc and estado_qualy == 'upcoming':
                 #mandar tabla quinielas
                 await archivar_quinielas_participante(encurso_siguiente_Carrera.items[0]['key'])
-                im, carrera_nombre, texto_estadisticas = crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
+                im, carrera_nombre, texto_estadisticas = await crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
                 texto = "Quinielas para la carrera " + encurso_siguiente_Carrera.items[0]['Nombre']
                 with BytesIO() as tablaquinielaimagen:    
                     im.save(tablaquinielaimagen, "png")
@@ -445,8 +468,9 @@ async def actualizar_tablas():
                 carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
                 cambiar_estado_qualy = encurso_siguiente_Carrera.items[0]['q']
                 cambiar_estado_qualy['estado'] = 'EMPEZADA'
-                dbCarreras.update(updates={'q':cambiar_estado_qualy}, key=carrera_codigo)
-            revisar_Pilotos = dbPilotos.fetch({'Carrera':encurso_siguiente_Carrera.items[0]['key']})
+                await dbCarreras.update(updates={'q':cambiar_estado_qualy}, key=carrera_codigo)
+            dbPilotos = deta.AsyncBase('Pilotos')
+            revisar_Pilotos = await dbPilotos.fetch({'Carrera':encurso_siguiente_Carrera.items[0]['key']})
             if(revisar_Pilotos.count == 0):
                 response = requests.get(url=urlevent_tracker, headers=headerapi)
                 response.encoding = 'utf-8-sig'
@@ -458,11 +482,11 @@ async def actualizar_tablas():
                     response = requests.get(url=urllivetiming + driverslist)
                     response.encoding = 'utf-8-sig'
                     response_dict = response.json()
-                    dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
+                    await dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
                     for id in response_dict:
-                        piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
+                        piloto = await dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
                         if(piloto.count == 0):
-                            record_pilotos = dbPilotos.get('2023')      
+                            record_pilotos = await dbPilotos.get('2023')      
                             listapilotos = record_pilotos['Lista']
                             listapilotos[response_dict[id]['RacingNumber']] = {
                                 'codigo':response_dict[id]['Tla'],
@@ -471,7 +495,8 @@ async def actualizar_tablas():
                                 'Equipo':response_dict[id]['TeamName'],
                                 'AcumuladoPuntos':0
                             }
-                            dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
+                            await dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
+            
             else:    
                 horario_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0][revisar_Pilotos.items[0]['Sesion']]['hora_termino']) 
                 horario_siguiente_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0]['Termino']) 
@@ -497,9 +522,9 @@ async def actualizar_tablas():
                         response = requests.get(url=urllivetiming + driverslist)
                         response.encoding = 'utf-8-sig'
                         response_dict = response.json()
-                        dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
+                        await dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
                         for id in response_dict:
-                            piloto = dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
+                            piloto = await dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
                             if(piloto.count == 0):
                                 record_pilotos = dbPilotos.get('2023')      
                                 listapilotos = record_pilotos['Lista']
@@ -510,8 +535,9 @@ async def actualizar_tablas():
                                     'Equipo':response_dict[id]['TeamName'],
                                     'AcumuladoPuntos':0
                                 }
-                                dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
+                                await dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
                         # if(sesion_carrera == 'r'):                            
+            await dbPilotos.close()
             if hora_actual_utc > horario_termino_utc:
                 response = requests.get(url=urlevent_tracker, headers=headerapi)
                 response.encoding = 'utf-8-sig'
@@ -526,12 +552,13 @@ async def actualizar_tablas():
                         posiciones_dict, pilotos_con_puntos = await obtener_resultados(url_results, encurso_siguiente_Carrera.items[0]['key'])
                         if pilotos_con_puntos >= 10:
                             await archivar_puntos_participante(encurso_siguiente_Carrera.items[0]['key'], posiciones_dict)
-                            dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
+                            await dbCarreras.update(updates={'Estado':'NO_ENVIADA'}, key=encurso_siguiente_Carrera.items[0]['key'])
                             await bot_quiniela.send_message(
                                 chat_id= float(controles['grupo']), 
                                 text='Se guardaron los resultados de la carrera correctamente en la base de datos. En un momento mando las imagenes.'
                                 )
                             logger.warning('Llego hasta el final del codigo.')
+    await dbCarreras.close()
     return
 
 async def enviar_pagos():
