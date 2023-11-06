@@ -58,13 +58,12 @@ PORT = int(os.getenv('PORT'))
 # dbPilotos = deta.AsyncBase("Pilotos")
 # dbPagos = deta.AsyncBase('Pagos')
 # dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
-dbConfiguracion= deta.AsyncBase('Configuracion')
+# dbConfiguracion= deta.AsyncBase('Configuracion')
 
 dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre','dicembre']
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-controles = await dbConfiguracion.get('controles')
-await dbConfiguracion.close()
+
 
 async def obtener_resultados(url, carrera):
     dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
@@ -130,6 +129,9 @@ async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
     dbHistorico = deta.AsyncBase('Historico')
     dbPilotos = deta.AsyncBase("Pilotos")
     dbPagos = deta.AsyncBase('Pagos')
+    dbConfiguracion= deta.AsyncBase('Configuracion')
+    controles = await dbConfiguracion.get('controles')
+    await dbConfiguracion.close()
     carrera = await dbCarreras.get(carrera_codigo)
     await dbCarreras.close()
     piloto_fetch = await dbPilotos.get('2023')
