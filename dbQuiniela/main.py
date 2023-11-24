@@ -564,8 +564,9 @@ async def actualizar_tablas():
     return
 
 async def enviar_pagos():
+    dbPagos = deta.AsyncBase('Pagos')
     bot_quiniela = Bot(BOT_TOKEN)
-    pagos_por_enviar = dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
+    pagos_por_enviar = await dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
     if pagos_por_enviar.count > 0:
         for pago in pagos_por_enviar.items:
             texto = 'Este pago ya fue ' + pago['estado']+ ' por el tesorero.'
@@ -576,7 +577,8 @@ async def enviar_pagos():
                 text=texto,
                 reply_to_message_id=pago['mensaje']
             )                
-            dbPagos.update(updates={'enviado':True}, key=pago['key'])
+            await dbPagos.update(updates={'enviado':True}, key=pago['key'])
+    await dbPagos.close()
     return
 
 async def healthcheck_bot():

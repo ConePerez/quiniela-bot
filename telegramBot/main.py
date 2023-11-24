@@ -1017,6 +1017,8 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     texto = "Tu lista para la carrera " + carrera_quiniela.items[0]['Nombre'] + " se ha guardado en la base de datos. Quedo de la siguiente manera:\n"
     for index, codigo in enumerate(context.user_data['Lista']):
         texto = texto + 'P' + str(index + 1) + ' ' + codigo + '\n'
+    if len(context.user_data['Lista']) > 7:
+        texto = 'Hubo un error en la captura, mas de 7 pilotos entraron en tu quiniela. Por favor vuelve con el comando /quiniela a meter una captura.'
     await query.edit_message_text(text=texto)
     return ConversationHandler.END
 
