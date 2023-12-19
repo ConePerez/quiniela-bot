@@ -414,6 +414,7 @@ async def actualizar_tablas():
         rondas_archivadas = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'CANCELADA'}])
         rondas_archivadas = rondas_archivadas.count
         if(carrera_codigo_eventtracker is None):
+            es_valida = True
             carrera_codigo = response_dict['fomRaceId']
             carrera_nombre = response_dict['race']['meetingOfficialName']
             carrera_estado = response_dict['seasonContext']['state']
@@ -431,12 +432,15 @@ async def actualizar_tablas():
             carrera_dict['Ronda'] = str(rondas_archivadas + 1)
             for session in range(len(response_dict['seasonContext']['timetables'])):
                 session_row = response_dict['seasonContext']['timetables'][session]
+                if session_row['startTime'] == 'TBC':
+                    es_valida = False
                 carrera_dict[session_row['session']] = {
                     'estado': session_row['state'],
                     'hora_empiezo': session_row['startTime'] + session_row['gmtOffset'],
                     'hora_termino': session_row['endTime'] + session_row['gmtOffset'],
                 }
-            await dbCarreras.put(carrera_dict)
+            if es_valida:
+                await dbCarreras.put(carrera_dict)
             # mandar mensaje de proxima
     else:
         estado_Carrera = encurso_siguiente_Carrera.items[0]['Estado']
