@@ -18,6 +18,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 import asyncio
+from utilidades import *
 
 try:
     from telegram import __version_info__
@@ -220,6 +221,7 @@ def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     tablaquinielatamano = dibujo.multiline_textbbox([0,0],str(tablaquiniela),font=letra)
     im = im.resize((tablaquinielatamano[2] + 20, tablaquinielatamano[3] + 40))
     dibujo = ImageDraw.Draw(im)
+    # dibujo = poner_fondo_gris(dibujo, datosquiniela.count, tablaquinielatamano[2])
     dibujo.text((10, 10), str(tablaquiniela), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
@@ -249,6 +251,7 @@ def crear_tabla_general():
     tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
     im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
     dibujo = ImageDraw.Draw(im)
+    dibujo = poner_fondo_gris(dibujo, resultados_historicos.count, tablaresultados_tamano[2])
     dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaresultados_tamano[3] + 20), "Total de rondas incluidas: " + str(total_rondas), font=letraabajo, fill="black")

@@ -1,5 +1,4 @@
 import os
-from time import sleep
 import logging
 import pytz
 import requests
@@ -12,30 +11,12 @@ from operator import itemgetter
 from io import BytesIO
 from telegram import __version__ as TG_VER
 from collections import Counter
-import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response
+from starlette.responses import Response
 from starlette.routing import Route
-import asyncio
-
-try:
-    from telegram import __version_info__
-except ImportError:
-    __version_info__ = (0, 0, 0, 0, 0)  # type: ignore[assignment]
-
-if __version_info__ < (20, 0, 0, "alpha", 1):
-    raise RuntimeError(
-        f"This example is not compatible with your current PTB version {TG_VER}. To view the "
-        f"{TG_VER} version of this example, "
-        f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
-    )
-
-# from fastapi import FastAPI, Request
-
-from telegram import (
-    Bot,
-)
+from utilidades import *
+from telegram import Bot
 
 # Enable logging
 logging.basicConfig(
@@ -51,15 +32,6 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 WEBHOOK_URL = 'https://' + os.getenv('DETA_SPACE_APP_HOSTNAME')
 PORT = int(os.getenv('PORT'))
 
-# dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
-# dbCarreras = deta.AsyncBase('Carreras')
-# dbHistorico = deta.AsyncBase('Historico')
-# dbQuiniela = deta.AsyncBase("Quiniela")
-# dbPilotos = deta.AsyncBase("Pilotos")
-# dbPagos = deta.AsyncBase('Pagos')
-# dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
-# dbConfiguracion= deta.AsyncBase('Configuracion')
-
 dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre','dicembre']
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
@@ -70,7 +42,6 @@ async def obtener_resultados(url, carrera):
     dbCarreras = deta.AsyncBase('Carreras')
     soup = BeautifulSoup(requests.get(url).text)
     table = soup.find('table')
-    # header = []
     rows = []
     for i, row in enumerate(table.find_all('tr')):
         if i == 0:
@@ -164,7 +135,6 @@ async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
         # se termino revisar pagos
         for i_lista in range(len(listaquiniela)):
             piloto = listaquiniela[i_lista]
-            
             numero_piloto = ''
             for n in piloto_fetch['Lista']:
                 if(piloto == piloto_fetch['Lista'][n]['codigo']):
@@ -181,7 +151,6 @@ async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
     await dbHistorico.close()
     await dbPagos.close()
     
-
 async def crear_tabla_puntos(obj_carrera):
     dbPuntosPilotos = deta.AsyncBase("PuntosPilotos")
     dbPilotos = deta.AsyncBase("Pilotos")
@@ -245,6 +214,7 @@ async def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     tablaquinielatamano = dibujo.multiline_textbbox([0,0],str(tablaquiniela),font=letra)
     im = im.resize((tablaquinielatamano[2] + 20, tablaquinielatamano[3] + 40))
     dibujo = ImageDraw.Draw(im)
+    dibujo = poner_fondo_gris(dibujo, datosquiniela.count, tablaquinielatamano[2])
     dibujo.text((10, 10), str(tablaquiniela), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
@@ -277,6 +247,7 @@ async def crear_tabla_general():
     tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
     im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
     dibujo = ImageDraw.Draw(im)
+    dibujo = poner_fondo_gris(dibujo, resultados_historicos.count, tablaresultados_tamano[2])
     dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaresultados_tamano[3] + 20), "Total de rondas incluidas: " + str(total_rondas), font=letraabajo, fill="black")
