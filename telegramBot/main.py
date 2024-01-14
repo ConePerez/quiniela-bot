@@ -17,6 +17,8 @@ from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 import asyncio
 from utilidades import *
+import numpy as np
+import matplotlib.pyplot as plt
 
 try:
     from telegram import __version_info__
@@ -213,7 +215,6 @@ async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "Comando cancelado, puedes empezar de nuevo con el comando /start", 
         reply_markup=ReplyKeyboardRemove()
     )
-
     return ConversationHandler.END
 
 async def help(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -384,11 +385,21 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if(ahora > horario_qualy):
             enmascarar = False
             mensaje = "Quinielas para ronda: "
-        im, carrera_nombre, texto_estadisticas = await crear_tabla_quinielas(carreras.items[0], enmascarar)
+        im, carrera_nombre, graficaPilotosPos = await crear_tabla_quinielas(carreras.items[0], enmascarar)
         with BytesIO() as tablaquinielaimagen:    
             im.save(tablaquinielaimagen, "png")
             tablaquinielaimagen.seek(0)
-            await update.message.reply_photo(tablaquinielaimagen, caption= mensaje + carrera_nombre + '\n' + texto_estadisticas)
+            await update.message.reply_photo(tablaquinielaimagen, caption= mensaje + carrera_nombre)
+        if not enmascarar:
+            texto = "Grafica de los pilotos para la carrera de " + carrera_nombre
+            with BytesIO() as graficaPilotosPos_imagen:    
+                graficaPilotosPos.savefig(graficaPilotosPos_imagen)
+                graficaPilotosPos_imagen.seek(0)
+                await context.bot.send_photo(
+                    chat_id = update.message.chat.id,
+                    photo=graficaPilotosPos_imagen, 
+                    caption=texto
+                    )
         return ConversationHandler.END
     await update.message.reply_text(
         'Aun no pasa un dia despues de la ultima carrera, no hay quinielas por mostrar.'

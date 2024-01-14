@@ -5,8 +5,9 @@ import requests
 from prettytable import PrettyTable
 from datetime import datetime
 import pytz
-from collections import Counter
 from operator import itemgetter
+import numpy as np
+import matplotlib.pyplot as plt
 
 deta = Deta()
 
@@ -162,6 +163,7 @@ async def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     """Crear la tabla de las quinielas en una imagen."""
     carrera_nombre = carrera_en_curso['Nombre']
     carrera_clave = carrera_en_curso['key']
+    
     tablaquiniela = PrettyTable()
     tablaquiniela.title = carrera_nombre
     tablaquiniela.field_names = ["Fecha/hora", "Nombre", "P1", "P2", "P3", "P4", "P5", "P6", "P7",]
@@ -169,27 +171,38 @@ async def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     dbQuiniela = deta.AsyncBase('Quiniela')
     datosquiniela = await dbQuiniela.fetch({'Carrera':carrera_clave})
     filas = datosquiniela.items    
-    datos_posiciones = {'P1': [], 'P2': [], 'P3': [], 'P4': [], 'P5': [], 'P6': [], 'P7': []}        
+    
+    pilotos_posiciones_conteo = {'P1': [], 'P2': [], 'P3': [], 'P4': [], 'P5': [], 'P6': [], 'P7': []}
+    pilotos_en_quiniela = []
+    indice_piloto = 0
     for index in range(datosquiniela.count):
         fila = filas[index]
         listaquiniela = fila["Lista"].split(",")
         for pos, piloto in enumerate(listaquiniela):
-            datos_posiciones['P' + str(pos + 1)].append(piloto)
+            if piloto in pilotos_en_quiniela:
+                indice_piloto = pilotos_en_quiniela.index(piloto)
+            else:
+                pilotos_en_quiniela.append(piloto)
+                indice_piloto = len(pilotos_en_quiniela) - 1
+            if len(pilotos_posiciones_conteo['P' + str(pos + 1)]) > indice_piloto:
+                pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] = pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] + 1
+            else:
+                for i in range(1 + indice_piloto - len(pilotos_posiciones_conteo['P' + str(pos +1)])):
+                    pilotos_posiciones_conteo['P' + str(pos +1)].append(0)
+                pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] = 1
         if(enmascarada):
             listaquiniela = ["XXX"] * len(listaquiniela)
         fechahoraoriginal = datetime.fromisoformat(fila["FechaHora"])
         fechahoragdl = fechahoraoriginal.astimezone(pytz.timezone('America/Mexico_City'))
         tablaquiniela.add_row([fechahoragdl.strftime('%Y-%m-%d %H:%M:%S'), fila["Nombre"], listaquiniela[0], listaquiniela[1], listaquiniela[2], listaquiniela[3], listaquiniela[4], listaquiniela[5], listaquiniela[6]])
-    texto_estadisticas = ''
+    indice_piloto = 0
+    for pos, conteo in pilotos_posiciones_conteo.items():
+        if len(conteo) != len(pilotos_en_quiniela):
+            for i in range(len(pilotos_en_quiniela) - len(conteo)):
+                pilotos_posiciones_conteo[pos].append(0)
     if not enmascarada:
-        for pos, datos in datos_posiciones.items():
-            total = len(datos)
-            contador = Counter(datos)
-            texto_estadisticas = texto_estadisticas + pos
-            contador = dict(sorted(contador.items(), key=lambda item: item[1], reverse=True))
-            for piloto, repeticion in contador.items():
-                texto_estadisticas = texto_estadisticas + ' ' + piloto + ' ' + str( round(100 * repeticion/total, 1) ) + '%'
-            texto_estadisticas = texto_estadisticas + '\n'
+        fig, ax = plotBarHorizontal(pilotos_posiciones_conteo, pilotos_en_quiniela)
+    
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
     letra = ImageFont.truetype("Menlo.ttc", 15)
@@ -201,7 +214,30 @@ async def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
     await dbQuiniela.close()
-    return im, carrera_nombre, texto_estadisticas
+    
+    return im, carrera_nombre, fig
+
+def plotBarHorizontal(results, category_names):
+    labels = list(results.keys())
+    data = np.array(list(results.values()))
+    data_cum = data.cumsum(axis=1)
+    category_colors = plt.colormaps['RdYlGn'](
+        np.linspace(0.15, 0.85, data.shape[1]))
+    fig, ax = plt.subplots(figsize=(9.2, 5))
+    ax.invert_yaxis()
+    ax.xaxis.set_visible(False)
+    ax.set_xlim(0, np.sum(data, axis=1).max())
+    ax.set_title("Porcentaje de pilotos por posicion")
+    for i, (colname, color) in enumerate(zip(category_names, category_colors)):
+        widths = data[:, i]
+        starts = data_cum[:, i] - widths
+        rects = ax.barh(labels, widths, left=starts, height=0.5,
+                        label=colname, color=color)
+        r, g, b, _ = color
+        text_color = 'white' if r * g * b < 0.5 else 'darkgrey'
+        ax.bar_label(rects, label_type='center', color=text_color, fmt=lambda x: f'{category_names[i]}' if x>0 else f'')
+
+    return fig, ax
 
 async def crear_tabla_general():
     tablaresultados = PrettyTable()

@@ -11,6 +11,8 @@ from starlette.responses import Response
 from starlette.routing import Route
 from utilidades import *
 from telegram import Bot
+import numpy as np
+import matplotlib.pyplot as plt
 
 # Enable logging
 logging.basicConfig(
@@ -142,7 +144,7 @@ async def actualizar_tablas():
             if hora_actual_utc >= horario_q_sesion_utc and estado_qualy == 'upcoming':
                 #mandar tabla quinielas
                 await archivar_quinielas_participante(encurso_siguiente_Carrera.items[0]['key'])
-                im, carrera_nombre, texto_estadisticas = await crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
+                im, carrera_nombre, graficaPilotosPos = await crear_tabla_quinielas(encurso_siguiente_Carrera.items[0], False)
                 texto = "Quinielas para la carrera " + encurso_siguiente_Carrera.items[0]['Nombre']
                 with BytesIO() as tablaquinielaimagen:    
                     im.save(tablaquinielaimagen, "png")
@@ -150,7 +152,16 @@ async def actualizar_tablas():
                     await bot_quiniela.send_photo(
                         chat_id= float(controles['grupo']),
                         photo=tablaquinielaimagen, 
-                        caption=texto + '\n' + texto_estadisticas
+                        caption=texto
+                        )
+                texto = "Grafica de los pilotos para la carrera de " + carrera_nombre
+                with BytesIO() as graficaPilotosPos_imagen:    
+                    graficaPilotosPos.render_to_png(graficaPilotosPos_imagen)
+                    graficaPilotosPos_imagen.seek(0)
+                    await bot_quiniela.send_photo(
+                        chat_id= float(controles['grupo']),
+                        photo=graficaPilotosPos_imagen, 
+                        caption=texto
                         )
                 carrera_codigo = encurso_siguiente_Carrera.items[0]['key']
                 cambiar_estado_qualy = encurso_siguiente_Carrera.items[0]['q']
