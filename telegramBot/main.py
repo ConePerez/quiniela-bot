@@ -114,6 +114,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         reply_markup=ReplyKeyboardRemove()
     )
     return ConversationHandler.END
+
 async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Crear tabla con detalle de puntos por carrera de un participante"""
     im, mensaje = await detalle_individual_historico(str(update.message.from_user.id))
@@ -131,7 +132,6 @@ async def mispuntos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             tablaindividualpuntosimagen.seek(0)
             await update.message.reply_photo(tablaindividualpuntosimagen, caption= mensaje)
     return ConversationHandler.END
-
 
 async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Comando para desplegar la tabla de pagos"""
@@ -272,8 +272,7 @@ async def guardar_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def subir_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.message.from_user
-    pago_carreras = update.message.text
-    context.user_data["pago_carreras"] = pago_carreras
+    context.user_data["pago_carreras"] = update.message.text
     dbPagos.update(updates={'carreras':context.user_data["pago_carreras"], 'estado':'sinfoto'}, key=context.user_data["fecha"])
     await update.message.reply_text(
         "Sube la foto del comprobante de pago de las " + context.user_data["pago_carreras"] + ' carreras',
@@ -286,12 +285,34 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ahora = datetime.now()
     ahora = ahora.astimezone()
     ahora_gdl = ahora.astimezone(pytz.timezone('America/Mexico_City'))
+    pagos_guardados, pagos_confirmados = await pagos_usuario(str(user.id))
+    controles = dbConfiguracion.get('controles')
+    resto = int(controles['rondas']) - pagos_guardados
+    if resto == 0:
+        await update.message.reply_text(
+            'Ya cubriste todas las carresas. Puedes meter tu /quiniela sin problema.',
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return ConversationHandler.END
+    COLUMNAS = 5
+    keyboard = []
+    cuenta_columnas = COLUMNAS
+    for boton in range(resto):
+        if COLUMNAS == cuenta_columnas:
+            keyboard.append([])
+            cuenta_columnas = 0
+        keyboard[len(keyboard) - 1].append(str(boton + 1))
+        cuenta_columnas = cuenta_columnas + 1
+    # if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
+    #     for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
+    #         keyboard[len(keyboard) - 1].append('')
+
     context.user_data["fecha"] = ahora_gdl.isoformat()
     dbPagos.put({'key': context.user_data["fecha"], 'usuario':str(user.id) , 'carreras':'' , 'foto':'' , 'estado':'creado', 'enviado':False})
     await update.message.reply_text(
         '¿Cuantas carreras vas a cubrir con el comprobante de pago?', 
         reply_markup=ReplyKeyboardMarkup(
-            [['1', '2','3','4','5'], ['6', '7','8','9','10'], ['11', '12','13','14','15'], ['Todas']], 
+            keyboard, 
             one_time_keyboard=True, 
             input_field_placeholder="Numero de carreras:")
         )

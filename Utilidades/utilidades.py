@@ -422,3 +422,15 @@ async def detalle_individual_puntos(usuario):
     await dbPilotos.close()
     await dbPuntosPilotos.close()
     return im, texto_mensaje
+
+async def pagos_usuario(usuario):
+    dbPagos = deta.AsyncBase('Pagos')
+    pagos_usuario = await dbPagos.fetch([{'usuario':usuario, 'estado':'guardado'},{'usuario':usuario, 'estado':'confirmado'}])
+    await dbPagos.close()
+    pagos_guardados = 0
+    pagos_confirmados = 0
+    for pago in pagos_usuario.items:
+        pagos_guardados += int(pago['carreras'])
+        if pago['estado'] == 'confirmado':
+            pagos_confirmados += int(pago['carreras'])
+    return pagos_guardados, pagos_confirmados
