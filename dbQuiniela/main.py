@@ -180,11 +180,11 @@ async def actualizar_tablas():
                     response = requests.get(url=urllivetiming + driverslist)
                     response.encoding = 'utf-8-sig'
                     response_dict = response.json()
-                    await dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
+                    await dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2024')
                     for id in response_dict:
                         piloto = await dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
                         if(piloto.count == 0):
-                            record_pilotos = await dbPilotos.get('2023')      
+                            record_pilotos = await dbPilotos.get('2024')      
                             listapilotos = record_pilotos['Lista']
                             listapilotos[response_dict[id]['RacingNumber']] = {
                                 'codigo':response_dict[id]['Tla'],
@@ -193,7 +193,7 @@ async def actualizar_tablas():
                                 'Equipo':response_dict[id]['TeamName'],
                                 'AcumuladoPuntos':0
                             }
-                            await dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
+                            await dbPilotos.update(updates={'Lista':listapilotos}, key='2024')
             
             else:    
                 horario_sesion = datetime.fromisoformat(encurso_siguiente_Carrera.items[0][revisar_Pilotos.items[0]['Sesion']]['hora_termino']) 
@@ -220,11 +220,11 @@ async def actualizar_tablas():
                         response = requests.get(url=urllivetiming + driverslist)
                         response.encoding = 'utf-8-sig'
                         response_dict = response.json()
-                        await dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2023')
+                        await dbPilotos.update(updates={'Carrera': encurso_siguiente_Carrera.items[0]['key'], 'Sesion': sesion_carrera}, key='2024')
                         for id in response_dict:
                             piloto = await dbPilotos.fetch({'Lista.' + response_dict[id]['RacingNumber'] + '.Nombre':response_dict[id]['FirstName']})
                             if(piloto.count == 0):
-                                record_pilotos = dbPilotos.get('2023')      
+                                record_pilotos = dbPilotos.get('2024')      
                                 listapilotos = record_pilotos['Lista']
                                 listapilotos[response_dict[id]['RacingNumber']] = {
                                     'codigo':response_dict[id]['Tla'],
@@ -233,7 +233,7 @@ async def actualizar_tablas():
                                     'Equipo':response_dict[id]['TeamName'],
                                     'AcumuladoPuntos':0
                                 }
-                                await dbPilotos.update(updates={'Lista':listapilotos}, key='2023')
+                                await dbPilotos.update(updates={'Lista':listapilotos}, key='2024')
                         # if(sesion_carrera == 'r'):                            
             await dbPilotos.close()
             if hora_actual_utc > horario_termino_utc:

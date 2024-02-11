@@ -87,7 +87,7 @@ async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
     await dbConfiguracion.close()
     carrera = await dbCarreras.get(carrera_codigo)
     await dbCarreras.close()
-    piloto_fetch = await dbPilotos.get('2023')
+    piloto_fetch = await dbPilotos.get('2024')
     await dbPilotos.close()
     historico_participantes = await dbHistorico.fetch()
     for historico_participante in historico_participantes.items:
@@ -142,7 +142,7 @@ async def crear_tabla_puntos(obj_carrera):
     tabla_puntos_piloto.sortby = "Pos"
     resultado_pilotos = await dbPuntosPilotos.get(obj_carrera['key'])
     await dbPuntosPilotos.close()
-    detalles_piloto = await dbPilotos.get('2023')
+    detalles_piloto = await dbPilotos.get('2024')
     await dbPilotos.close()
     detalles_piloto = detalles_piloto['Lista']
     for numero, resultado in resultado_pilotos['Pilotos'].items():
@@ -171,48 +171,50 @@ async def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     dbQuiniela = deta.AsyncBase('Quiniela')
     datosquiniela = await dbQuiniela.fetch({'Carrera':carrera_clave})
     filas = datosquiniela.items    
-    
-    pilotos_posiciones_conteo = {'P1': [], 'P2': [], 'P3': [], 'P4': [], 'P5': [], 'P6': [], 'P7': []}
-    pilotos_en_quiniela = []
-    indice_piloto = 0
-    for index in range(datosquiniela.count):
-        fila = filas[index]
-        listaquiniela = fila["Lista"].split(",")
-        for pos, piloto in enumerate(listaquiniela):
-            if piloto in pilotos_en_quiniela:
-                indice_piloto = pilotos_en_quiniela.index(piloto)
-            else:
-                pilotos_en_quiniela.append(piloto)
-                indice_piloto = len(pilotos_en_quiniela) - 1
-            if len(pilotos_posiciones_conteo['P' + str(pos + 1)]) > indice_piloto:
-                pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] = pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] + 1
-            else:
-                for i in range(1 + indice_piloto - len(pilotos_posiciones_conteo['P' + str(pos +1)])):
-                    pilotos_posiciones_conteo['P' + str(pos +1)].append(0)
-                pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] = 1
-        if(enmascarada):
-            listaquiniela = ["XXX"] * len(listaquiniela)
-        fechahoraoriginal = datetime.fromisoformat(fila["FechaHora"])
-        fechahoragdl = fechahoraoriginal.astimezone(pytz.timezone('America/Mexico_City'))
-        tablaquiniela.add_row([fechahoragdl.strftime('%Y-%m-%d %H:%M:%S'), fila["Nombre"], listaquiniela[0], listaquiniela[1], listaquiniela[2], listaquiniela[3], listaquiniela[4], listaquiniela[5], listaquiniela[6]])
-    indice_piloto = 0
-    for pos, conteo in pilotos_posiciones_conteo.items():
-        if len(conteo) != len(pilotos_en_quiniela):
-            for i in range(len(pilotos_en_quiniela) - len(conteo)):
-                pilotos_posiciones_conteo[pos].append(0)
-    if not enmascarada:
-        fig, ax = plotBarHorizontal(pilotos_posiciones_conteo, pilotos_en_quiniela)
-    
     im = Image.new("RGB", (200, 200), "white")
-    dibujo = ImageDraw.Draw(im)
-    letra = ImageFont.truetype("Menlo.ttc", 15)
-    tablaquinielatamano = dibujo.multiline_textbbox([0,0],str(tablaquiniela),font=letra)
-    im = im.resize((tablaquinielatamano[2] + 20, tablaquinielatamano[3] + 40))
-    dibujo = ImageDraw.Draw(im)
-    dibujo = poner_fondo_gris(dibujo, datosquiniela.count, tablaquinielatamano[2])
-    dibujo.text((10, 10), str(tablaquiniela), font=letra, fill="black")
-    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
-    dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
+    fig = 'No hay carreras archivadas.'
+    if datosquiniela.count > 0:
+        fig = 'Si hay quinielas'
+        pilotos_posiciones_conteo = {'P1': [], 'P2': [], 'P3': [], 'P4': [], 'P5': [], 'P6': [], 'P7': []}
+        pilotos_en_quiniela = []
+        indice_piloto = 0
+        for index in range(datosquiniela.count):
+            fila = filas[index]
+            listaquiniela = fila["Lista"].split(",")
+            for pos, piloto in enumerate(listaquiniela):
+                if piloto in pilotos_en_quiniela:
+                    indice_piloto = pilotos_en_quiniela.index(piloto)
+                else:
+                    pilotos_en_quiniela.append(piloto)
+                    indice_piloto = len(pilotos_en_quiniela) - 1
+                if len(pilotos_posiciones_conteo['P' + str(pos + 1)]) > indice_piloto:
+                    pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] = pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] + 1
+                else:
+                    for i in range(1 + indice_piloto - len(pilotos_posiciones_conteo['P' + str(pos +1)])):
+                        pilotos_posiciones_conteo['P' + str(pos +1)].append(0)
+                    pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] = 1
+            if(enmascarada):
+                listaquiniela = ["XXX"] * len(listaquiniela)
+            fechahoraoriginal = datetime.fromisoformat(fila["FechaHora"])
+            fechahoragdl = fechahoraoriginal.astimezone(pytz.timezone('America/Mexico_City'))
+            tablaquiniela.add_row([fechahoragdl.strftime('%Y-%m-%d %H:%M:%S'), fila["Nombre"], listaquiniela[0], listaquiniela[1], listaquiniela[2], listaquiniela[3], listaquiniela[4], listaquiniela[5], listaquiniela[6]])
+        indice_piloto = 0
+        for pos, conteo in pilotos_posiciones_conteo.items():
+            if len(conteo) != len(pilotos_en_quiniela):
+                for i in range(len(pilotos_en_quiniela) - len(conteo)):
+                    pilotos_posiciones_conteo[pos].append(0)
+        if not enmascarada:
+            fig, ax = plotBarHorizontal(pilotos_posiciones_conteo, pilotos_en_quiniela)
+                
+        dibujo = ImageDraw.Draw(im)
+        letra = ImageFont.truetype("Menlo.ttc", 15)
+        tablaquinielatamano = dibujo.multiline_textbbox([0,0],str(tablaquiniela),font=letra)
+        im = im.resize((tablaquinielatamano[2] + 20, tablaquinielatamano[3] + 40))
+        dibujo = ImageDraw.Draw(im)
+        dibujo = poner_fondo_gris(dibujo, datosquiniela.count, tablaquinielatamano[2])
+        dibujo.text((10, 10), str(tablaquiniela), font=letra, fill="black")
+        letraabajo = ImageFont.truetype("Menlo.ttc", 10)
+        dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
     await dbQuiniela.close()
     
     return im, carrera_nombre, fig
@@ -250,25 +252,26 @@ async def crear_tabla_general():
     resultados_historicos = await dbHistorico.fetch()
     total_rondas = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
     total_rondas = total_rondas.count
-    for usuario in resultados_historicos.items:
-        normales = 0
-        extras = 0
-        penalizaciones = 0
-        for carrera in usuario['Resultados']:
-            normales = normales + usuario['Resultados'][carrera]['normales']
-            extras = extras + usuario['Resultados'][carrera]['extras']
-            penalizaciones = penalizaciones + usuario['Resultados'][carrera]['penalizaciones']
-        tablaresultados.add_row([usuario["Nombre"], normales + extras + penalizaciones, normales, extras, penalizaciones])   
     im = Image.new("RGB", (200, 200), "white")
-    dibujo = ImageDraw.Draw(im)
-    letra = ImageFont.truetype("Menlo.ttc", 15)
-    tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
-    im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
-    dibujo = ImageDraw.Draw(im)
-    dibujo = poner_fondo_gris(dibujo, resultados_historicos.count, tablaresultados_tamano[2])
-    dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
-    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
-    dibujo.text((20, tablaresultados_tamano[3] + 20), "Total de rondas incluidas: " + str(total_rondas), font=letraabajo, fill="black")
+    if total_rondas > 0:
+        for usuario in resultados_historicos.items:
+            normales = 0
+            extras = 0
+            penalizaciones = 0
+            for carrera in usuario['Resultados']:
+                normales = normales + usuario['Resultados'][carrera]['normales']
+                extras = extras + usuario['Resultados'][carrera]['extras']
+                penalizaciones = penalizaciones + usuario['Resultados'][carrera]['penalizaciones']
+            tablaresultados.add_row([usuario["Nombre"], normales + extras + penalizaciones, normales, extras, penalizaciones])   
+        dibujo = ImageDraw.Draw(im)
+        letra = ImageFont.truetype("Menlo.ttc", 15)
+        tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
+        im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
+        dibujo = ImageDraw.Draw(im)
+        dibujo = poner_fondo_gris(dibujo, resultados_historicos.count, tablaresultados_tamano[2])
+        dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
+        letraabajo = ImageFont.truetype("Menlo.ttc", 10)
+        dibujo.text((20, tablaresultados_tamano[3] + 20), "Total de rondas incluidas: " + str(total_rondas), font=letraabajo, fill="black")
     await dbHistorico.close()
     await dbCarreras.close()
     return im, total_rondas
@@ -279,61 +282,64 @@ async def crear_tabla_resultados():
     carreras = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
     maximo_horario = datetime.fromisoformat('2023-01-01T00:00:00.000+00:00')
     ultima_carrera_archivada = ''
-    for carrera in carreras.items:
-        horario_Carrera = datetime.fromisoformat(carrera['Termino'])
-        if(horario_Carrera > maximo_horario):
-            maximo_horario = horario_Carrera
-            ultima_carrera_archivada = carrera['key']
-    
-    carrera_codigo = ultima_carrera_archivada
-    carrera_dict = await dbCarreras.get(carrera_codigo)
-    carrera_nombre = carrera_dict['Nombre']
-    tablaresultados = PrettyTable()
-    tablaresultados.title = carrera_nombre
-    tablaresultados.field_names = ["Nombre", "Puntos Totales", "Puntos Pilotos", "Puntos Extras", "Penalizaciones"]
-    datosHistoricos = await dbHistorico.fetch()
-    usuarios = datosHistoricos.items
-    listaresultados = []
-
-    for index in range(datosHistoricos.count):
-        usuario = usuarios[index]
-        puntos_totales = usuario['Resultados'][carrera_codigo]['normales'] + usuario['Resultados'][carrera_codigo]['extras'] + usuario['Resultados'][carrera_codigo]['penalizaciones']
-        listaresultados.append([usuario["Nombre"], puntos_totales, usuario['Resultados'][carrera_codigo]['normales'], usuario['Resultados'][carrera_codigo]['extras'], usuario['Resultados'][carrera_codigo]['penalizaciones']])
-    listaresultados.sort(key=itemgetter(4,1), reverse=True)
-
-    linea = False
-    ganador = ''
-    puntos_ganador = 0
-    texto_ganador = 'El ganador de la carrera ' + carrera_nombre + ' es: '
-    for index in range(len(listaresultados)):
-        resultado = listaresultados[index]
-        siguiente_resultado = listaresultados[min(index + 1, len(listaresultados) - 1) ]
-        if index == 0:
-            ganador = resultado[0]
-            puntos_ganador = resultado[1]
-        else:
-            if (resultado[1] == puntos_ganador and resultado[4] >= 0):
-                ganador = ganador + ', ' + resultado[0]
-                texto_ganador = 'Los ganadores de la carrera ' + carrera_nombre + ' son: '
-        if(siguiente_resultado[4] < 0 and not linea):
-            tablaresultados.add_row(resultado,  divider=True)
-            linea = True
-        else:
-            tablaresultados.add_row(resultado)
-    if puntos_ganador >= 90:
-        texto_ganador = texto_ganador + ganador + '. Con un total de ' + str(puntos_ganador) + ' puntos.'
-    else:
-        texto_ganador = 'No hubo ganador para la carrera: ' + carrera_nombre + '. Nadie logro hacer 90 puntos o mas. El premio se acumula para la /proxima carrera.'
     im = Image.new("RGB", (200, 200), "white")
-    dibujo = ImageDraw.Draw(im)
-    letra = ImageFont.truetype("Menlo.ttc", 15)
-    tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
-    im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
-    dibujo = ImageDraw.Draw(im)
-    dibujo = poner_fondo_gris(dibujo, datosHistoricos.count, tablaresultados_tamano[2])
-    dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
-    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
-    dibujo.text((20, tablaresultados_tamano[3] + 20), "Los que tienen penalizaciones no pueden ganar el premio, estan en la segunda seccion de la tabla", font=letraabajo, fill="black")
+    texto_ganador = 'No hay carreras archivadas.'
+    if carreras.count > 0:
+        for carrera in carreras.items:
+            horario_Carrera = datetime.fromisoformat(carrera['Termino'])
+            if(horario_Carrera > maximo_horario):
+                maximo_horario = horario_Carrera
+                ultima_carrera_archivada = carrera['key']
+        
+        carrera_codigo = ultima_carrera_archivada
+        carrera_dict = await dbCarreras.get(carrera_codigo)
+        carrera_nombre = carrera_dict['Nombre']
+        tablaresultados = PrettyTable()
+        tablaresultados.title = carrera_nombre
+        tablaresultados.field_names = ["Nombre", "Puntos Totales", "Puntos Pilotos", "Puntos Extras", "Penalizaciones"]
+        datosHistoricos = await dbHistorico.fetch()
+        usuarios = datosHistoricos.items
+        listaresultados = []
+
+        for index in range(datosHistoricos.count):
+            usuario = usuarios[index]
+            puntos_totales = usuario['Resultados'][carrera_codigo]['normales'] + usuario['Resultados'][carrera_codigo]['extras'] + usuario['Resultados'][carrera_codigo]['penalizaciones']
+            listaresultados.append([usuario["Nombre"], puntos_totales, usuario['Resultados'][carrera_codigo]['normales'], usuario['Resultados'][carrera_codigo]['extras'], usuario['Resultados'][carrera_codigo]['penalizaciones']])
+        listaresultados.sort(key=itemgetter(4,1), reverse=True)
+
+        linea = False
+        ganador = ''
+        puntos_ganador = 0
+        texto_ganador = 'El ganador de la carrera ' + carrera_nombre + ' es: '
+        for index in range(len(listaresultados)):
+            resultado = listaresultados[index]
+            siguiente_resultado = listaresultados[min(index + 1, len(listaresultados) - 1) ]
+            if index == 0:
+                ganador = resultado[0]
+                puntos_ganador = resultado[1]
+            else:
+                if (resultado[1] == puntos_ganador and resultado[4] >= 0):
+                    ganador = ganador + ', ' + resultado[0]
+                    texto_ganador = 'Los ganadores de la carrera ' + carrera_nombre + ' son: '
+            if(siguiente_resultado[4] < 0 and not linea):
+                tablaresultados.add_row(resultado,  divider=True)
+                linea = True
+            else:
+                tablaresultados.add_row(resultado)
+        if puntos_ganador >= 90:
+            texto_ganador = texto_ganador + ganador + '. Con un total de ' + str(puntos_ganador) + ' puntos.'
+        else:
+            texto_ganador = 'No hubo ganador para la carrera: ' + carrera_nombre + '. Nadie logro hacer 90 puntos o mas. El premio se acumula para la /proxima carrera.'
+        im = Image.new("RGB", (200, 200), "white")
+        dibujo = ImageDraw.Draw(im)
+        letra = ImageFont.truetype("Menlo.ttc", 15)
+        tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
+        im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
+        dibujo = ImageDraw.Draw(im)
+        dibujo = poner_fondo_gris(dibujo, datosHistoricos.count, tablaresultados_tamano[2])
+        dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
+        letraabajo = ImageFont.truetype("Menlo.ttc", 10)
+        dibujo.text((20, tablaresultados_tamano[3] + 20), "Los que tienen penalizaciones no pueden ganar el premio, estan en la segunda seccion de la tabla", font=letraabajo, fill="black")
     await dbCarreras.close()
     await dbHistorico.close()
     return im, texto_ganador
@@ -342,28 +348,31 @@ async def detalle_individual_historico(usuario):
     dbHistorico = deta.AsyncBase('Historico')
     dbCarreras = deta.AsyncBase('Carreras')
     mi_historico = await dbHistorico.get(usuario)
-    tabla_historico_puntos = PrettyTable()
-    tabla_historico_puntos.title = 'Tabla de puntos obtenidos por carrera'
-    tabla_historico_puntos.field_names = ["Ronda", "Nombre", "Puntos Totales", "Puntos Piloto","Puntos Extras", "Penaizaciones"]
-    tabla_historico_puntos.sortby = "Ronda"
-    puntos_totales = 0
-    for codigo_carrera, puntos in mi_historico['Resultados'].items():
-        carrera = await dbCarreras.get(codigo_carrera)
-        puntos_carrera = puntos['normales'] + puntos['extras'] + puntos['penalizaciones']
-        puntos_totales += puntos_carrera
-        tabla_historico_puntos.add_row([ int(carrera['Ronda']), carrera['Nombre'], puntos_carrera, puntos['normales'] , puntos['extras'], puntos['penalizaciones']])
-    texto_abajo = f'Total de puntos: {puntos_totales}'
-    texto_mensaje = f'Este es el detalle de los puntos por carrera que has obtenido hasta el momento'
     im = Image.new("RGB", (200, 200), "white")
-    dibujo = ImageDraw.Draw(im)
-    letra = ImageFont.truetype("Menlo.ttc", 15)
-    tabladetalletamano = dibujo.multiline_textbbox([0,0],str(tabla_historico_puntos),font=letra)
-    im = im.resize((tabladetalletamano[2] + 20, tabladetalletamano[3] + 40))
-    dibujo = ImageDraw.Draw(im)
-    dibujo = poner_fondo_gris(dibujo, len(mi_historico['Resultados']), tabladetalletamano[2])
-    dibujo.text((10, 10), str(tabla_historico_puntos), font=letra, fill="black")
-    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
-    dibujo.text((20, tabladetalletamano[3] + 20), texto_abajo, font=letra, fill="black")
+    texto_mensaje = 'No hay carreras archivadas.'
+    if mi_historico is not None:
+        tabla_historico_puntos = PrettyTable()
+        tabla_historico_puntos.title = 'Tabla de puntos obtenidos por carrera'
+        tabla_historico_puntos.field_names = ["Ronda", "Nombre", "Puntos Totales", "Puntos Piloto","Puntos Extras", "Penaizaciones"]
+        tabla_historico_puntos.sortby = "Ronda"
+        puntos_totales = 0
+        for codigo_carrera, puntos in mi_historico['Resultados'].items():
+            carrera = await dbCarreras.get(codigo_carrera)
+            puntos_carrera = puntos['normales'] + puntos['extras'] + puntos['penalizaciones']
+            puntos_totales += puntos_carrera
+            tabla_historico_puntos.add_row([ int(carrera['Ronda']), carrera['Nombre'], puntos_carrera, puntos['normales'] , puntos['extras'], puntos['penalizaciones']])
+        texto_abajo = f'Total de puntos: {puntos_totales}'
+        texto_mensaje = f'Este es el detalle de los puntos por carrera que has obtenido hasta el momento'
+        im = Image.new("RGB", (200, 200), "white")
+        dibujo = ImageDraw.Draw(im)
+        letra = ImageFont.truetype("Menlo.ttc", 15)
+        tabladetalletamano = dibujo.multiline_textbbox([0,0],str(tabla_historico_puntos),font=letra)
+        im = im.resize((tabladetalletamano[2] + 20, tabladetalletamano[3] + 40))
+        dibujo = ImageDraw.Draw(im)
+        dibujo = poner_fondo_gris(dibujo, len(mi_historico['Resultados']), tabladetalletamano[2])
+        dibujo.text((10, 10), str(tabla_historico_puntos), font=letra, fill="black")
+        letraabajo = ImageFont.truetype("Menlo.ttc", 10)
+        dibujo.text((20, tabladetalletamano[3] + 20), texto_abajo, font=letra, fill="black")
     await dbCarreras.close()
     await dbHistorico.close()
     return im, texto_mensaje
@@ -376,51 +385,55 @@ async def detalle_individual_puntos(usuario):
     carreras = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
     maximo_horario = datetime.fromisoformat('2023-01-01T00:00:00.000+00:00')
     ultima_carrera_archivada = {}
+    im = Image.new("RGB", (200, 200), "white")
+    texto_mensaje = 'No hay carreras archivadas.'
     for carrera in carreras.items:
         horario_Carrera = datetime.fromisoformat(carrera['Termino'])
         if(horario_Carrera > maximo_horario):
             maximo_horario = horario_Carrera
             ultima_carrera_archivada = carrera
-    tabla_detalle_puntos = PrettyTable()
-    tabla_detalle_puntos.title = ultima_carrera_archivada['Nombre']
-    tabla_detalle_puntos.field_names = ["Pos", "Piloto", "Puntos", "Tus Puntos", "Tus Extras"]
-    tabla_detalle_puntos.sortby = "Pos"
-    resultado_pilotos = await dbPuntosPilotos.get(ultima_carrera_archivada['key'])
-    detalles_piloto = await dbPilotos.get('2023')
-    detalles_piloto = detalles_piloto['Lista']
-    mi_historico = await dbHistorico.get(usuario)
-    mi_lista = mi_historico['Quinielas'][ultima_carrera_archivada['key']]['Lista']
-    mi_quiniela_carrera = mi_historico['Quinielas'][ultima_carrera_archivada['key']]['Carrera']
-    mis_puntos_totales = mi_historico['Resultados'][ultima_carrera_archivada['key']]['extras'] + mi_historico['Resultados'][ultima_carrera_archivada['key']]['normales'] + mi_historico['Resultados'][ultima_carrera_archivada['key']]['penalizaciones']
-    mis_penalizaciones = mi_historico['Resultados'][ultima_carrera_archivada['key']]['penalizaciones']
-    mi_quiniela = mi_historico['Quinielas'][ultima_carrera_archivada['key']]['Lista'].split(',')
-    texto_abajo = f'Tu quiniela: {mi_lista}'
-    texto_mensaje = f'Tus puntos totales fueron: {mis_puntos_totales}, en la imagen puedes ver como los obtuviste. Tambien puedes revisar el documento de las reglas con el comando /ayuda para mas detalles'
-    if mis_penalizaciones < 0:
-        texto_mensaje = f'Tus puntos totales fueron: {mis_puntos_totales}, en la imagen puedes ver como obtuviste los puntos por pilotos y los puntos extras. Estuviste penalizado con {mis_penalizaciones} estos los debes de restar de los puntos de la imagen. Recuerda que puedes revisar las reglas con el comando /ayuda'
-    for numero, resultado in resultado_pilotos['Pilotos'].items():
-        mis_puntos_pilotos = 0
-        mis_puntos_extras = 0
-        if detalles_piloto[numero]['codigo'] in mi_quiniela:
-            mis_puntos_pilotos = resultado['puntos']
-            mi_posicion = mi_quiniela.index(detalles_piloto[numero]['codigo']) + 1
-            if mi_posicion == resultado['posicion']:
-                mis_puntos_extras = 2
-        tabla_detalle_puntos.add_row([resultado['posicion'], detalles_piloto[numero]['codigo'] , resultado['puntos'], mis_puntos_pilotos , mis_puntos_extras])
-    im = Image.new("RGB", (200, 200), "white")
-    dibujo = ImageDraw.Draw(im)
-    letra = ImageFont.truetype("Menlo.ttc", 15)
-    tabladetalletamano = dibujo.multiline_textbbox([0,0],str(tabla_detalle_puntos),font=letra)
-    im = im.resize((tabladetalletamano[2] + 20, tabladetalletamano[3] + 40))
-    dibujo = ImageDraw.Draw(im)
-    dibujo = poner_fondo_gris(dibujo, len(resultado_pilotos['Pilotos']), tabladetalletamano[2])
-    dibujo.text((10, 10), str(tabla_detalle_puntos), font=letra, fill="black")
-    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
-    dibujo.text((20, tabladetalletamano[3] + 20), texto_abajo, font=letra, fill="black")    
+    if carreras.count > 0:
+        tabla_detalle_puntos = PrettyTable()
+        tabla_detalle_puntos.title = ultima_carrera_archivada['Nombre']
+        tabla_detalle_puntos.field_names = ["Pos", "Piloto", "Puntos", "Tus Puntos", "Tus Extras"]
+        tabla_detalle_puntos.sortby = "Pos"
+        resultado_pilotos = await dbPuntosPilotos.get(ultima_carrera_archivada['key'])
+        detalles_piloto = await dbPilotos.get('2024')
+        detalles_piloto = detalles_piloto['Lista']
+        mi_historico = await dbHistorico.get(usuario)
+        mi_lista = mi_historico['Quinielas'][ultima_carrera_archivada['key']]['Lista']
+        mi_quiniela_carrera = mi_historico['Quinielas'][ultima_carrera_archivada['key']]['Carrera']
+        mis_puntos_totales = mi_historico['Resultados'][ultima_carrera_archivada['key']]['extras'] + mi_historico['Resultados'][ultima_carrera_archivada['key']]['normales'] + mi_historico['Resultados'][ultima_carrera_archivada['key']]['penalizaciones']
+        mis_penalizaciones = mi_historico['Resultados'][ultima_carrera_archivada['key']]['penalizaciones']
+        mi_quiniela = mi_historico['Quinielas'][ultima_carrera_archivada['key']]['Lista'].split(',')
+        texto_abajo = f'Tu quiniela: {mi_lista}'
+        texto_mensaje = f'Tus puntos totales fueron: {mis_puntos_totales}, en la imagen puedes ver como los obtuviste. Tambien puedes revisar el documento de las reglas con el comando /ayuda para mas detalles'
+        if mis_penalizaciones < 0:
+            texto_mensaje = f'Tus puntos totales fueron: {mis_puntos_totales}, en la imagen puedes ver como obtuviste los puntos por pilotos y los puntos extras. Estuviste penalizado con {mis_penalizaciones} estos los debes de restar de los puntos de la imagen. Recuerda que puedes revisar las reglas con el comando /ayuda'
+        for numero, resultado in resultado_pilotos['Pilotos'].items():
+            mis_puntos_pilotos = 0
+            mis_puntos_extras = 0
+            if detalles_piloto[numero]['codigo'] in mi_quiniela:
+                mis_puntos_pilotos = resultado['puntos']
+                mi_posicion = mi_quiniela.index(detalles_piloto[numero]['codigo']) + 1
+                if mi_posicion == resultado['posicion']:
+                    mis_puntos_extras = 2
+            tabla_detalle_puntos.add_row([resultado['posicion'], detalles_piloto[numero]['codigo'] , resultado['puntos'], mis_puntos_pilotos , mis_puntos_extras])
+    
+        dibujo = ImageDraw.Draw(im)
+        letra = ImageFont.truetype("Menlo.ttc", 15)
+        tabladetalletamano = dibujo.multiline_textbbox([0,0],str(tabla_detalle_puntos),font=letra)
+        im = im.resize((tabladetalletamano[2] + 20, tabladetalletamano[3] + 40))
+        dibujo = ImageDraw.Draw(im)
+        dibujo = poner_fondo_gris(dibujo, len(resultado_pilotos['Pilotos']), tabladetalletamano[2])
+        dibujo.text((10, 10), str(tabla_detalle_puntos), font=letra, fill="black")
+        letraabajo = ImageFont.truetype("Menlo.ttc", 10)
+        dibujo.text((20, tabladetalletamano[3] + 20), texto_abajo, font=letra, fill="black")    
     await dbCarreras.close()
     await dbHistorico.close()
     await dbPilotos.close()
     await dbPuntosPilotos.close()
+    
     return im, texto_mensaje
 
 async def pagos_usuario(usuario):

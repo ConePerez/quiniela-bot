@@ -118,6 +118,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Crear tabla con detalle de puntos por carrera de un participante"""
     im, mensaje = await detalle_individual_historico(str(update.message.from_user.id))
+    if mensaje == 'No hay carreras archivadas.':
+        await update.message.reply_text(mensaje)
+        return ConversationHandler.END
     with BytesIO() as tablaindividualhistoricoimagen:
         im.save(tablaindividualhistoricoimagen, "png")
         tablaindividualhistoricoimagen.seek(0)
@@ -127,6 +130,9 @@ async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def mispuntos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Crear tabla con detalle de puntos por participante"""
     im, mensaje = await detalle_individual_puntos(str(update.message.from_user.id))
+    if mensaje == 'No hay carreras archivadas.':
+        await update.message.reply_text(mensaje)
+        return ConversationHandler.END
     with BytesIO() as tablaindividualpuntosimagen:    
             im.save(tablaindividualpuntosimagen, "png")
             tablaindividualpuntosimagen.seek(0)
@@ -407,6 +413,9 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             enmascarar = False
             mensaje = "Quinielas para ronda: "
         im, carrera_nombre, graficaPilotosPos = await crear_tabla_quinielas(carreras.items[0], enmascarar)
+        if graficaPilotosPos == 'No hay carreras archivadas.':
+            await update.message.reply_text(graficaPilotosPos)
+            return ConversationHandler.END
         with BytesIO() as tablaquinielaimagen:    
             im.save(tablaquinielaimagen, "png")
             tablaquinielaimagen.seek(0)
@@ -429,6 +438,9 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def general(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     im, total_rondas = await crear_tabla_general()
+    if total_rondas == 0:
+        await update.message.reply_text('No hay carreras archivadas.')
+        return ConversationHandler.END
     with BytesIO() as tablaresutados_imagen:    
         im.save(tablaresutados_imagen, "png")
         tablaresutados_imagen.seek(0)
@@ -439,6 +451,9 @@ async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Sends a picture"""
     # aggregar un if, si hay carrera en curso mandar mensaje de espera
     im, texto = await crear_tabla_resultados()
+    if texto == 'No hay carreras archivadas.':
+        await update.message.reply_text(texto)
+        return ConversationHandler.END
     with BytesIO() as tablaresutados_imagen:    
         im.save(tablaresutados_imagen, "png")
         tablaresutados_imagen.seek(0)
@@ -448,7 +463,7 @@ async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['Lista'] = []
     puntospilotos = dbPuntosPilotos.fetch()
-    pilotoslista = dbPilotos.get('2023')['Lista']
+    pilotoslista = dbPilotos.get('2024')['Lista']
     carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     if carrera_quiniela.count == 0:
         await update.message.reply_text(
@@ -758,7 +773,7 @@ async def main() -> None:
     """Set up the application and a custom webserver."""
     url = WEBHOOK_URL
     port = PORT
-    pilotoslista = dbPilotos.get('2023')['Lista']
+    pilotoslista = dbPilotos.get('2024')['Lista']
     filtropilotos = 'NADA|ATRAS|'
     for pilotonumer in pilotoslista:
         filtropilotos = filtropilotos + '|' + pilotoslista[pilotonumer]['codigo']
