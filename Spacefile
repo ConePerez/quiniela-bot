@@ -2,7 +2,7 @@
 v: 0
 micros:
   - name: BotQuiniela
-    src: telegramBot
+    src: ./telegramBot
     engine: python3.9
     dev: ./../.venv/bin/python3 main.py
     run: python3 main.py
@@ -16,7 +16,7 @@ micros:
     primary: true  
 
   - name: BaseDeDatos
-    src: dbQuiniela
+    src: ./dbQuiniela
     engine: python3.9
     path: basedatos
     dev: ./../.venv/bin/uvicorn main:app --reload
