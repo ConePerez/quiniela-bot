@@ -70,7 +70,7 @@ WEBHOOK_URL = 'https://' + os.getenv('DETA_SPACE_APP_HOSTNAME')
 PORT = int(os.getenv('PORT'))
 # BotToken = os.getenv("BOT_TOKEN")
 # bot_hostname = os.getenv("DETA_SPACE_APP_HOSTNAME")
-QUINIELA, FAVORITOS, CONFIRMAR_PENALIZACION, SUBIRCOMPROBANTE, GUARDARCOMPROBANTE, VALIDARPAGO, SIGUIENTEPAGO, FINPAGOS, MENU_AYUDA, GUARDAR_PILOTOS, CONFIRMAR_PILOTOS, P1, P2, P3, P4, P5, P6, P7 = range(18)
+QUINIELA, FAVORITOS, CONFIRMAR_PENALIZACION, SUBIRCOMPROBANTE, GUARDARCOMPROBANTE, PROCESARPAGO, PAGOREVISADO, PAGOCONFIRMADO, SIGUIENTEPAGOREVISAR, SIGUIENTEPAGOCONFIRMAR, FINPAGOS, MENU_AYUDA, GUARDAR_PILOTOS, CONFIRMAR_PILOTOS, P1, P2, P3, P4, P5, P6, P7 = range(21)
 REGLAS = 'reglas'
 AYUDA = 'ayuda'
 ultima_carrera = ''
@@ -268,8 +268,9 @@ async def ayuda(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def guardar_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     photo_id = update.message.photo[-1].file_id
     mensaje = update.effective_message.id
+    mensaje_texto = update.effective_message.caption
     user = update.message.from_user
-    dbPagos.update(updates={'foto':photo_id, 'estado':'guardado', 'mensaje':mensaje}, key=context.user_data["fecha"])
+    dbPagos.update(updates={'foto':photo_id, 'estado':'guardado', 'mensaje':mensaje, 'texto':mensaje_texto}, key=context.user_data["fecha"])
     await update.message.reply_text(
         "Tu pago se ha guardado por " + context.user_data["pago_carreras"] + " carreras" +  ". El tesorero va a revisar la foto del comprobante para confirmarlo",
         reply_markup=ReplyKeyboardRemove()
@@ -326,25 +327,52 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def revisarpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     pagos_guardados = dbPagos.fetch({'estado':'guardado'})
-    pagos_por_confirmar = str(pagos_guardados.count)
+    pagos_en_revision = dbPagos.fetch({'estado':'revision'})
+    pagos_por_revisar = str(pagos_guardados.count)
+    pagos_por_confirmar = str(pagos_en_revision.count)
     context.user_data['procesados'] = 0
-    if pagos_guardados.count == 0:
+    if pagos_por_revisar == '0' and pagos_por_confirmar == '0':
         await update.message.reply_text(
-        "No hay pagos por confirmar.", 
+        "No hay pagos por revisar o confirmar", 
         reply_markup=ReplyKeyboardRemove()
-    )
+        )
         return ConversationHandler.END
     await update.message.reply_text(
-        'Hay ' + pagos_por_confirmar + ' pagos por confirmar, ¿quieres empezar a confirmarlos?', 
+        'Hay ' + pagos_por_revisar + ' pagos por revisar y hay ' + pagos_por_confirmar + ' pagos por confirmar ¿Que quieres hacer?', 
         reply_markup=ReplyKeyboardMarkup(
-            [['Si', 'No']], 
+            [['Revisar', 'Confirmar', 'Cancelar']], 
             one_time_keyboard=True, 
             )
         )
-    return VALIDARPAGO
+    return PROCESARPAGO
 
-async def validarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def revisarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     pagos_guardados = dbPagos.fetch({'estado':'guardado'})
+    if pagos_guardados.count == 0:
+        pagos_procesados = str(context.user_data['procesados'])
+        await update.message.reply_text(
+            'Revisaste ' + pagos_procesados + ' pagos, ya no quedan mas pagos por revisar.',
+            reply_markup=ReplyKeyboardRemove()
+            )
+        return ConversationHandler.END
+    else:
+        pago_revisar = pagos_guardados.items[0]
+        numero_carreras = pago_revisar['carreras']
+        texto = pago_revisar['texto']
+        usuario = dbQuiniela.get(pago_revisar['usuario'])['Nombre']
+        context.user_data["pago"] = pago_revisar['key']
+        await update.message.reply_photo(
+            pago_revisar['foto'], 
+            caption='Marcar como revisado este pago por ' + numero_carreras + ' carreras, enviado por ' + usuario + ' con el siguiente mensaje: "' + texto + '"',
+            reply_markup=ReplyKeyboardMarkup(
+                [['Si', 'No']], 
+                one_time_keyboard=True, 
+                )
+            )
+        return PAGOREVISADO
+
+async def confirmarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    pagos_guardados = dbPagos.fetch({'estado':'revision'})
     if pagos_guardados.count == 0:
         pagos_procesados = str(context.user_data['procesados'])
         await update.message.reply_text(
@@ -355,47 +383,61 @@ async def validarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     else:
         pago_confirmar = pagos_guardados.items[0]
         numero_carreras = pago_confirmar['carreras']
+        texto = pago_confirmar['texto']
         usuario = dbQuiniela.get(pago_confirmar['usuario'])['Nombre']
         context.user_data["pago"] = pago_confirmar['key']
         await update.message.reply_photo(
             pago_confirmar['foto'], 
-            caption='Confirmas este pago por ' + numero_carreras + ' carreras, enviado por ' + usuario,
+            caption='Confirmas este pago por ' + numero_carreras + ' carreras, enviado por ' + usuario + ' con el siguiente mensaje: "' + texto + '"',
             reply_markup=ReplyKeyboardMarkup(
                 [['Si', 'No']], 
                 one_time_keyboard=True, 
                 )
             )
-        return SIGUIENTEPAGO
+        return PAGOCONFIRMADO
+
+async def pagorevisado(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    dbPagos.update(updates={'estado':'revision'}, key=context.user_data['pago'])
+    context.user_data['procesados'] = context.user_data['procesados'] + 1
+    await update.message.reply_text(
+            'Pago revisado ¿quieres procesar otro pago?', 
+            reply_markup=ReplyKeyboardMarkup(
+                [['Si', 'No']], 
+                one_time_keyboard=True, 
+                )
+            )
+    return SIGUIENTEPAGOREVISAR
 
 async def pagovalidado(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     dbPagos.update(updates={'estado':'confirmado'}, key=context.user_data['pago'])
     context.user_data['procesados'] = context.user_data['procesados'] + 1
     await update.message.reply_text(
-            'Pago validado ¿quieres confirmar el siguiente pago?', 
+            'Pago validado ¿quieres procesar otro pago?', 
             reply_markup=ReplyKeyboardMarkup(
                 [['Si', 'No']], 
                 one_time_keyboard=True, 
                 )
             )
-    return VALIDARPAGO
+    return SIGUIENTEPAGOCONFIRMAR
     
 async def pagorechazado(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     dbPagos.update(updates={'estado':'rechazado'}, key=context.user_data['pago'])
     context.user_data['procesados'] = context.user_data['procesados'] + 1
     await update.message.reply_text(
-            'Pago rechazado ¿quieres confirmar el siguiente pago?', 
+            'Pago rechazado ¿quieres procesar otro pago?', 
             reply_markup=ReplyKeyboardMarkup(
                 [['Si', 'No']], 
                 one_time_keyboard=True, 
                 )
             )
-    return VALIDARPAGO
+    return SIGUIENTEPAGOCONFIRMAR
 
 async def finpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    pagos_pendientes = str(dbPagos.fetch({'estado':'guardado'}).count)
+    pagos_pendientes_por_revisar = str(dbPagos.fetch({'estado':'guardado'}).count)
+    pagos_pendientes_por_validar = str(dbPagos.fetch({'estado':'revision'}).count)
     pagos_procesados = str(context.user_data['procesados'])
     await update.message.reply_text(
-        'Validaste ' + pagos_procesados + ' pagos, quedan pendientes ' + pagos_pendientes + 'pagos. Puedes volver a validar con /revisarpagos', 
+        'Revisaste o validaste ' + pagos_procesados + ' pagos, quedan pendientes ' + pagos_pendientes_por_revisar + ' por revisar y ' + pagos_pendientes_por_validar + ' por validar. Puedes volver a validar con /revisarpagos', 
         reply_markup=ReplyKeyboardRemove()
         )
     return ConversationHandler.END
@@ -812,8 +854,11 @@ async def main() -> None:
             # CONFIRMAR_PILOTOS:[CallbackQueryHandler(confirmar_pilotos, pattern=filtropilotos), CallbackQueryHandler(p7, pattern='^ATRAS$')],
             GUARDAR_PILOTOS:[CallbackQueryHandler(guardar_pilotos, pattern='^(CONFIRMAR|ATRAS)$')],
             MENU_AYUDA: [CallbackQueryHandler(reglas, pattern="^" + REGLAS + "$"), CallbackQueryHandler(ayuda, pattern="^" + AYUDA + "$")],
-            VALIDARPAGO: [MessageHandler(filters.Regex('^Si$'), validarpago), MessageHandler(filters.Regex('^No$'), finpagos)], 
-            SIGUIENTEPAGO: [MessageHandler(filters.Regex('^Si$'), pagovalidado), MessageHandler(filters.Regex('^No$'), pagorechazado)], 
+            PROCESARPAGO: [MessageHandler(filters.Regex('^Revisar$'), revisarpago), MessageHandler(filters.Regex('^Confirmar$'), confirmarpago), MessageHandler(filters.Regex('^Cancelar$'), finpagos)], 
+            PAGOREVISADO: [MessageHandler(filters.Regex('^Si$'), pagorevisado), MessageHandler(filters.Regex('^No$'), revisarpagos)],
+            PAGOCONFIRMADO: [MessageHandler(filters.Regex('^Si$'), pagovalidado), MessageHandler(filters.Regex('^No$'), pagorechazado)],
+            SIGUIENTEPAGOREVISAR: [MessageHandler(filters.Regex('^Si$'), revisarpago), MessageHandler(filters.Regex('^No$'), finpagos)],
+            SIGUIENTEPAGOCONFIRMAR: [MessageHandler(filters.Regex('^Si$'), confirmarpago), MessageHandler(filters.Regex('^No$'), finpagos)],  
             FINPAGOS: [MessageHandler(filters.Regex('^No$'), finpagos)],
             GUARDARCOMPROBANTE: [MessageHandler(filters.PHOTO, guardar_comprobante)], 
             SUBIRCOMPROBANTE: [MessageHandler(filters.Regex('^(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|Todas)$'), subir_comprobante)],
