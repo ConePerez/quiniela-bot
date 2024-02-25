@@ -268,7 +268,11 @@ async def ayuda(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def guardar_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     photo_id = update.message.photo[-1].file_id
     mensaje = update.effective_message.id
-    mensaje_texto = update.effective_message.caption
+    mensaje_texto = ''
+    if update.effective_message.caption is None:
+        mensaje_texto = 'Sin mensaje'
+    else:
+        mensaje_texto = update.effective_message.caption
     user = update.message.from_user
     dbPagos.update(updates={'foto':photo_id, 'estado':'guardado', 'mensaje':mensaje, 'texto':mensaje_texto}, key=context.user_data["fecha"])
     await update.message.reply_text(
