@@ -156,7 +156,7 @@ async def actualizar_tablas():
                         )
                 texto = "Grafica de los pilotos para la carrera de " + carrera_nombre
                 with BytesIO() as graficaPilotosPos_imagen:    
-                    graficaPilotosPos.render_to_png(graficaPilotosPos_imagen)
+                    graficaPilotosPos.savefig(graficaPilotosPos_imagen)
                     graficaPilotosPos_imagen.seek(0)
                     await bot_quiniela.send_photo(
                         chat_id= float(controles['grupo']),
@@ -265,7 +265,7 @@ async def enviar_pagos():
     pagos_por_enviar = await dbPagos.fetch([{'estado':'confirmado', 'enviado':False }, {'estado':'rechazado', 'enviado':False}])
     if pagos_por_enviar.count > 0:
         for pago in pagos_por_enviar.items:
-            texto = 'Este pago ya fue ' + pago['estado']+ ' por el tesorero.'
+            texto = 'Este pago ya fue ' + pago['estado']+ ' por el tesorero. Puedes revisar cuantas carreras tienes pagadas con el comando de /misaldo'
             userid = pago['usuario']
             logger.info(F'este es usuario {userid}')
             await bot_quiniela.send_message(

@@ -273,8 +273,8 @@ async def guardar_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE)
         mensaje_texto = 'Sin mensaje'
     else:
         mensaje_texto = update.effective_message.caption
-    user = update.message.from_user
-    dbPagos.update(updates={'foto':photo_id, 'estado':'guardado', 'mensaje':mensaje, 'texto':mensaje_texto}, key=context.user_data["fecha"])
+    usuario = update.message.from_user.first_name
+    dbPagos.update(updates={'foto':photo_id, 'estado':'guardado', 'mensaje':mensaje, 'texto':mensaje_texto, 'nombre':usuario}, key=context.user_data["fecha"])
     await update.message.reply_text(
         "Tu pago se ha guardado por " + context.user_data["pago_carreras"] + " carreras" +  ". El tesorero va a revisar la foto del comprobante para confirmarlo",
         reply_markup=ReplyKeyboardRemove()
@@ -363,7 +363,7 @@ async def revisarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         pago_revisar = pagos_guardados.items[0]
         numero_carreras = pago_revisar['carreras']
         texto = pago_revisar['texto']
-        usuario = dbQuiniela.get(pago_revisar['usuario'])['Nombre']
+        usuario = pago_revisar['nombre']
         context.user_data["pago"] = pago_revisar['key']
         await update.message.reply_photo(
             pago_revisar['foto'], 
@@ -388,7 +388,7 @@ async def confirmarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> in
         pago_confirmar = pagos_guardados.items[0]
         numero_carreras = pago_confirmar['carreras']
         texto = pago_confirmar['texto']
-        usuario = dbQuiniela.get(pago_confirmar['usuario'])['Nombre']
+        usuario = pago_confirmar['nombre']
         context.user_data["pago"] = pago_confirmar['key']
         await update.message.reply_photo(
             pago_confirmar['foto'], 
@@ -865,7 +865,7 @@ async def main() -> None:
             SIGUIENTEPAGOCONFIRMAR: [MessageHandler(filters.Regex('^Si$'), confirmarpago), MessageHandler(filters.Regex('^No$'), finpagos)],  
             FINPAGOS: [MessageHandler(filters.Regex('^No$'), finpagos)],
             GUARDARCOMPROBANTE: [MessageHandler(filters.PHOTO, guardar_comprobante)], 
-            SUBIRCOMPROBANTE: [MessageHandler(filters.Regex('^(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|Todas)$'), subir_comprobante)],
+            SUBIRCOMPROBANTE: [MessageHandler(filters.Regex('^(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24)$'), subir_comprobante)],
             },
         fallbacks=[CommandHandler("cancelar", cancelar)],
         # fallbacks=[CallbackQueryHandler(cancelar, pattern="cancelar$")],
