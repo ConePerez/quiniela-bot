@@ -250,8 +250,8 @@ async def crear_tabla_general():
     dbHistorico = deta.AsyncBase('Historico')
     dbCarreras = deta.AsyncBase('Carreras')
     resultados_historicos = await dbHistorico.fetch()
-    total_rondas = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
-    total_rondas = total_rondas.count
+    carreras_archivadas = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
+    total_rondas = carreras_archivadas.count
     im = Image.new("RGB", (200, 200), "white")
     if total_rondas > 0:
         for usuario in resultados_historicos.items:
@@ -259,9 +259,10 @@ async def crear_tabla_general():
             extras = 0
             penalizaciones = 0
             for carrera in usuario['Resultados']:
-                normales = normales + usuario['Resultados'][carrera]['normales']
-                extras = extras + usuario['Resultados'][carrera]['extras']
-                penalizaciones = penalizaciones + usuario['Resultados'][carrera]['penalizaciones']
+                if any(d['key'] == carrera for d in carreras_archivadas.items):
+                    normales = normales + usuario['Resultados'][carrera]['normales']
+                    extras = extras + usuario['Resultados'][carrera]['extras']
+                    penalizaciones = penalizaciones + usuario['Resultados'][carrera]['penalizaciones']
             tablaresultados.add_row([usuario["Nombre"], normales + extras + penalizaciones, normales, extras, penalizaciones])   
         dibujo = ImageDraw.Draw(im)
         letra = ImageFont.truetype("Menlo.ttc", 15)

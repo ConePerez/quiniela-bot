@@ -186,7 +186,7 @@ async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Comando para desplegar la informacion de la siguiente carrera"""
     proxima_Carrera = dbCarreras.fetch([{'Estado':'IDLE'},{'Estado':'EN-CURSO'}])
     if(proxima_Carrera.count == 0):
-        await update.message.replay_text(
+        await update.message.reply_text(
             'Todavia no se actualiza mi base de datos con la proxima carrera. Por lo general se actualiza un dia despues de que termino la ultima carrera.'
         )
         return ConversationHandler.END
