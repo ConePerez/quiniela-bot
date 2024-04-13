@@ -198,7 +198,7 @@ async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     orden_horarios = ['p1', 'p2', 'p3', 'q', 'r']
     texto_sesion = {'p1':'P1', 'p2':'P2', 'p3':'P3', 'q':'Qualy', 'r':'Carrera','ss':'Sprint Qualy', 's': 'Sprint'}
     if('s' in proxima_Carrera.items[0]):
-        orden_horarios = ['p1', 'q', 'ss', 's', 'r']
+        orden_horarios = ['p1', 'ss', 's', 'q', 'r']
     for sesion in orden_horarios:
         horario_sesion = datetime.fromisoformat(proxima_Carrera.items[0][sesion]['hora_empiezo'])
         horario_sesion = horario_sesion.astimezone(pytz.timezone('America/Mexico_City'))
