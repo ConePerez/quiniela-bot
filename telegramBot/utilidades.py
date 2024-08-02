@@ -33,15 +33,15 @@ async def obtener_resultados(url, carrera):
     posiciones_dict = {}
     pilotos_con_puntos = 0
     for row in rows:
-        if(row[1].isnumeric()):
-            posicion = int(row[1])
+        if(row[0].isnumeric()):
+            posicion = int(row[0])
             if(posicion < 11):
-                posiciones_dict[row[2]] = {
+                posiciones_dict[row[1]] = {
                     'posicion': posicion, 
-                    'intervalo': row[6],
-                    'puntos': int(row[7])
+                    'intervalo': row[5],
+                    'puntos': int(row[6])
                     }
-                if int(row[7]) > 0:
+                if int(row[6]) > 0:
                     pilotos_con_puntos = pilotos_con_puntos + 1
     await dbPuntosPilotos.put({'key': carrera, 'Pilotos':posiciones_dict})
     await dbCarreras.update(updates={'url':url}, key=carrera)
