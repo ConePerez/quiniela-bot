@@ -99,7 +99,9 @@ async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
             resultados = {'normales':0, 'extras':0, 'penalizaciones':-5}
         else:
             resultados = {'normales':0, 'extras':0, 'penalizaciones':0}
-        pagosusuarios = await dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},{'usuario':quiniela['key'], 'estado':'confirmado'} ])
+        pagosusuarios = await dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},
+                                             {'usuario':quiniela['key'], 'estado':'confirmado'}, 
+                                             {'usuario':quiniela['key'],'estado':'revision'} ])
         rondas_pagadas = 0
         rondas_confirmadas = 0
         for pagousuario in pagosusuarios.items:
