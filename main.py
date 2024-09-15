@@ -4,21 +4,18 @@ import logging
 import pytz
 from PIL import Image, ImageDraw, ImageFont
 from prettytable import PrettyTable
-from deta import Deta
 from datetime import datetime
 from operator import itemgetter
 from io import BytesIO
 from telegram import __version__ as TG_VER
 from collections import Counter
-import uvicorn
-from starlette.applications import Starlette
-from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response
-from starlette.routing import Route
-import asyncio
 from utilidades import *
 import numpy as np
 import matplotlib.pyplot as plt
+
+from contextlib import asynccontextmanager
+from http import HTTPStatus
+from fastapi import FastAPI, Request, Response
 
 try:
     from telegram import __version_info__
@@ -64,40 +61,105 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
-deta = Deta()
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-WEBHOOK_URL = 'https://' + os.getenv('DETA_SPACE_APP_HOSTNAME')
-PORT = int(os.getenv('PORT'))
-# BotToken = os.getenv("BOT_TOKEN")
-# bot_hostname = os.getenv("DETA_SPACE_APP_HOSTNAME")
+BOT_TOKEN = os.environ.get("TOKEN")
+WEBHOOK_URL = "https://parental-giulietta-conesoft-b7c0edc7.koyeb.app/"
 QUINIELA, FAVORITOS, CONFIRMAR_PENALIZACION, SUBIRCOMPROBANTE, GUARDARCOMPROBANTE, PROCESARPAGO, PAGOREVISADO, PAGOCONFIRMADO, SIGUIENTEPAGOREVISAR, SIGUIENTEPAGOCONFIRMAR, FINPAGOS, MENU_AYUDA, GUARDAR_PILOTOS, CONFIRMAR_PILOTOS, P1, P2, P3, P4, P5, P6, P7 = range(21)
 REGLAS = 'reglas'
 AYUDA = 'ayuda'
 ultima_carrera = ''
 siguiente_carrera = ''
-dbPuntosPilotos = deta.Base('PuntosPilotos')
-dbCarreras = deta.Base('Carreras')
-dbfavoritos = deta.Base("Favoritos")
-dbHistorico = deta.Base('Historico')
-dbQuiniela = deta.Base("Quiniela")
-dbPilotos = deta.Base("Pilotos")
-dbPagos = deta.Base('Pagos')
-dbConfiguracion= deta.Base('Configuracion')
-documentos = deta.Drive('Documentos')
+# dbPuntosPilotos = deta.Base('PuntosPilotos')
+# dbCarreras = deta.Base('Carreras')
+# dbfavoritos = deta.Base("Favoritos")
+# dbHistorico = deta.Base('Historico')
+# dbQuiniela = deta.Base("Quiniela")
+# dbPilotos = deta.Base("Pilotos")
+# dbPagos = deta.Base('Pagos')
+# dbConfiguracion= deta.Base('Configuracion')
+# documentos = deta.Drive('Documentos')
 dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre','dicembre']
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
 
+ptb = (
+    Application.builder()
+    .updater(None)
+    .token(BOT_TOKEN)
+    .read_timeout(7)
+    .get_updates_read_timeout(42)
+    .build()
+)
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    await ptb.bot.setWebhook("https://parental-giulietta-conesoft-b7c0edc7.koyeb.app/") # replace <your-webhook-url>
+    await ptb.bot.set_my_commands(
+        [
+            BotCommand("start", "empezar el bot"),
+            BotCommand("quiniela", "llenar la quiniela"),
+            BotCommand("mipago", "mandar comprobante pago"),
+            BotCommand("help", "mostrar reglas quiniela"),
+            BotCommand("cancelar", "cancelar una accion"),
+            BotCommand("mispuntos", "enviar detalle puntos ultima carrera"),
+            BotCommand("mihistorico", "enviar mis puntos por carrera"),
+            BotCommand("misaldo", "saber cuantas carreras pagadas tengo"),
+        ],
+        scope=BotCommandScopeAllPrivateChats()
+    )
+    await ptb.bot.set_my_commands(
+        [
+            BotCommand("quinielas", "quinielas al momento"),
+            BotCommand("resultados", "resultados ultima carrera"),
+            BotCommand("general", "tabla general"),
+            BotCommand("proxima", "cual es la proxima carrera"),
+            BotCommand("pagos", "tabla de pagos"),
+        ], 
+        scope=BotCommandScopeAllGroupChats()
+    )
+    await ptb.bot.set_my_commands(
+        [
+            BotCommand("start", "empezar el bot"),
+            BotCommand("quiniela", "llenar la quiniela"),
+            BotCommand("mipago", "mandar comprobante pago"),
+            BotCommand("revisarpagos", "revisar pagos pendientes"),
+            BotCommand("help", "mostrar reglas quiniela"),
+            BotCommand("cancelar", "cancelar una accion"),
+            BotCommand("mispuntos", "detalle puntos ultima carrera"),
+            BotCommand("mihistorico", "puntos por carrera"),
+            BotCommand("misaldo", "saber cuantas carreras pagadas tengo"),
+        ],
+        scope=BotCommandScopeChat(controles['tesorero'])
+    )    
+    async with ptb:
+        await ptb.start()
+        yield
+        await ptb.stop()
+
+# Initialize FastAPI app (similar to Flask)
+app = FastAPI(lifespan=lifespan)
+
+@app.post("/")
+async def process_update(request: Request):
+    req = await request.json()
+    update = Update.de_json(req, ptb.bot)
+    await ptb.process_update(update)
+    return Response(status_code=HTTPStatus.OK)
+
+@app.get("/test")
+async def test():
+    return "esto es una prueba"
+
 async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     usuario = str(update.message.from_user.id)
-    pagos_usuario = dbPagos.fetch([{'usuario':usuario, 'estado':'guardado'},{'usuario':usuario, 'estado':'confirmado'}])
+    # pagos_usuario = dbPagos.fetch([{'usuario':usuario, 'estado':'guardado'},{'usuario':usuario, 'estado':'confirmado'}])
     pagos_guardados = 0
     pagos_confirmados = 0
-    for pago in pagos_usuario.items:
-        pagos_guardados += int(pago['carreras'])
-        if pago['estado'] == 'confirmado':
-            pagos_confirmados += int(pago['carreras'])
-    carreras = dbCarreras.fetch().count
+    carreras = 0
+    # for pago in pagos_usuario.items:
+    #     pagos_guardados += int(pago['carreras'])
+    #     if pago['estado'] == 'confirmado':
+    #         pagos_confirmados += int(pago['carreras'])
+    # carreras = dbCarreras.fetch().count
     texto_mensaje = f'Hasta el momento llevas {pagos_guardados} pagadas ({pagos_confirmados} estan confirmados), para entrar a la /proxima carrera debes tener al menos {carreras} pagadas.'
     await update.message.reply_text(
         texto_mensaje, 
@@ -141,36 +203,37 @@ async def mispuntos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Comando para desplegar la tabla de pagos"""
-    carreras = dbCarreras.fetch()
-    total_carreras = str(carreras.count)
-    configuracion = dbConfiguracion.get('controles')
+    # carreras = dbCarreras.fetch()
+    # total_carreras = str(carreras.count)
+    total_carreras = 0
+    # configuracion = dbConfiguracion.get('controles')
     tablapagos = PrettyTable()
     tablapagos.title = 'Tabal de pagos'
     tablapagos.field_names = ["Nombre", "Total Rondas", "Rondas Pagadas", "Rondas Confirmadas"]
     tablapagos.sortby = "Nombre"
-    datosquiniela = dbQuiniela.fetch()
-    for usuarioquiniela in datosquiniela.items:
-        pagosusuarios = dbPagos.fetch([{'usuario':usuarioquiniela['key'], 'estado':'guardado'},{'usuario':usuarioquiniela['key'], 'estado':'confirmado'} ])
-        rondas_pagadas = 0
-        rondas_confirmadas = 0
-        for pagousuario in pagosusuarios.items:
-            if str(pagousuario['carreras']) == 'Todas':
-                rondas_pagadas = configuracion['rondas']
-            else:
-                rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
-            if pagousuario['estado'] == 'confirmado':
-                if pagousuario['carreras'] == 'Todas':
-                    rondas_confirmadas = configuracion['rondas']
-                else:
-                    rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
-        tablapagos.add_row([usuarioquiniela['Nombre'], configuracion['rondas'], str(rondas_pagadas), str(rondas_confirmadas)]) 
+    # datosquiniela = dbQuiniela.fetch()
+    # for usuarioquiniela in datosquiniela.items:
+    #     pagosusuarios = dbPagos.fetch([{'usuario':usuarioquiniela['key'], 'estado':'guardado'},{'usuario':usuarioquiniela['key'], 'estado':'confirmado'} ])
+    #     rondas_pagadas = 0
+    #     rondas_confirmadas = 0
+    #     for pagousuario in pagosusuarios.items:
+    #         if str(pagousuario['carreras']) == 'Todas':
+    #             rondas_pagadas = configuracion['rondas']
+    #         else:
+    #             rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
+    #         if pagousuario['estado'] == 'confirmado':
+    #             if pagousuario['carreras'] == 'Todas':
+    #                 rondas_confirmadas = configuracion['rondas']
+    #             else:
+    #                 rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
+    #     tablapagos.add_row([usuarioquiniela['Nombre'], configuracion['rondas'], str(rondas_pagadas), str(rondas_confirmadas)]) 
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
     letra = ImageFont.truetype("Menlo.ttc", 15)
     tablapagostamano = dibujo.multiline_textbbox([0,0],str(tablapagos),font=letra)
     im = im.resize((tablapagostamano[2] + 20, tablapagostamano[3] + 40))
     dibujo = ImageDraw.Draw(im)
-    poner_fondo_gris(dibujo=dibujo, total_filas=datosquiniela.count, largo_fila=tablapagostamano[2])
+    # poner_fondo_gris(dibujo=dibujo, total_filas=datosquiniela.count, largo_fila=tablapagostamano[2])
     dibujo.text((10, 10), str(tablapagos), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablapagostamano[3] + 20), "Ronda actual: " + total_carreras, font=letraabajo, fill="black")
@@ -184,7 +247,7 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Comando para desplegar la informacion de la siguiente carrera"""
-    proxima_Carrera = dbCarreras.fetch([{'Estado':'IDLE'},{'Estado':'EN-CURSO'}])
+    # proxima_Carrera = dbCarreras.fetch([{'Estado':'IDLE'},{'Estado':'EN-CURSO'}])
     if(proxima_Carrera.count == 0):
         await update.message.reply_text(
             'Todavia no se actualiza mi base de datos con la proxima carrera. Por lo general se actualiza un dia despues de que termino la ultima carrera.'
@@ -813,146 +876,51 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.edit_message_text(text=texto)
     return ConversationHandler.END
 
-controles = dbConfiguracion.get('controles')
-
-async def main() -> None:
-    """Set up the application and a custom webserver."""
-    url = WEBHOOK_URL
-    port = PORT
-    pilotoslista = dbPilotos.get('2024')['Lista']
-    filtropilotos = 'NADA|ATRAS|'
-    for pilotonumer in pilotoslista:
-        filtropilotos = filtropilotos + '|' + pilotoslista[pilotonumer]['codigo']
-    filtropilotos = '^(' + filtropilotos + ')$'
-    application = (
-        Application.builder().token(BOT_TOKEN).updater(None).build()
-    )
-
     # register handlers
-    conv_teclado = ConversationHandler(
-        entry_points=[
-            CommandHandler("quiniela", inicio_pilotos), 
-            CommandHandler("start", start),
-            CommandHandler("help", help),
-            CommandHandler("quinielas", quinielas),
-            CommandHandler("general", general),
-            CommandHandler("resultados", resultados),
-            CommandHandler("cancelar", cancelar),
-            CommandHandler("proxima", proxima),
-            CommandHandler("mipago", mipago),
-            CommandHandler("pagos", pagos),
-            CommandHandler("revisarpagos", revisarpagos),
-            CommandHandler("mispuntos", mispuntos),
-            CommandHandler("mihistorico", mihistorico),
-            CommandHandler("misaldo", misaldo),
-            ],
-        states={
-            # ELEGIR_PILOTOS:[CallbackQueryHandler(elegir_pilotos, pattern=filtropilotos), CallbackQueryHandler(confirmar_pilotos, pattern="^CONFIRMAR$")], 
-            P1:[CallbackQueryHandler(p1, pattern=filtropilotos)],
-            P2:[CallbackQueryHandler(p2, pattern=filtropilotos) ],
-            P3:[CallbackQueryHandler(p3, pattern=filtropilotos) ],
-            P4:[CallbackQueryHandler(p4, pattern=filtropilotos) ],
-            P5:[CallbackQueryHandler(p5, pattern=filtropilotos) ],
-            P6:[CallbackQueryHandler(p6, pattern=filtropilotos) ],
-            P7:[CallbackQueryHandler(p7, pattern=filtropilotos) ],
-            # CONFIRMAR_PILOTOS:[CallbackQueryHandler(confirmar_pilotos, pattern=filtropilotos), CallbackQueryHandler(p7, pattern='^ATRAS$')],
-            GUARDAR_PILOTOS:[CallbackQueryHandler(guardar_pilotos, pattern='^(CONFIRMAR|ATRAS)$')],
-            MENU_AYUDA: [CallbackQueryHandler(reglas, pattern="^" + REGLAS + "$"), CallbackQueryHandler(ayuda, pattern="^" + AYUDA + "$")],
-            PROCESARPAGO: [MessageHandler(filters.Regex('^Revisar$'), revisarpago), MessageHandler(filters.Regex('^Confirmar$'), confirmarpago), MessageHandler(filters.Regex('^Cancelar$'), finpagos)], 
-            PAGOREVISADO: [MessageHandler(filters.Regex('^Si$'), pagorevisado), MessageHandler(filters.Regex('^No$'), revisarpagos)],
-            PAGOCONFIRMADO: [MessageHandler(filters.Regex('^Si$'), pagovalidado), MessageHandler(filters.Regex('^No$'), pagorechazado)],
-            SIGUIENTEPAGOREVISAR: [MessageHandler(filters.Regex('^Si$'), revisarpago), MessageHandler(filters.Regex('^No$'), finpagos)],
-            SIGUIENTEPAGOCONFIRMAR: [MessageHandler(filters.Regex('^Si$'), confirmarpago), MessageHandler(filters.Regex('^No$'), finpagos)],  
-            FINPAGOS: [MessageHandler(filters.Regex('^No$'), finpagos)],
-            GUARDARCOMPROBANTE: [MessageHandler(filters.PHOTO, guardar_comprobante)], 
-            SUBIRCOMPROBANTE: [MessageHandler(filters.Regex('^(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24)$'), subir_comprobante)],
-            },
-        fallbacks=[CommandHandler("cancelar", cancelar)],
-        # fallbacks=[CallbackQueryHandler(cancelar, pattern="cancelar$")],
-        # per_message=True,
-        # name="my_conversation",
-        # persistent=True,
-        # block=False,
-    )
-    application.add_handler(conv_teclado)
 
-    # Pass webhook settings to telegram
-    await application.bot.delete_webhook()
-    sleep(3)
-    await application.bot.set_webhook(url=f"{url}/telegram", allowed_updates=Update.ALL_TYPES)
-    await application.bot.set_my_commands(
-        [
-            BotCommand("start", "empezar el bot"),
-            BotCommand("quiniela", "llenar la quiniela"),
-            BotCommand("mipago", "mandar comprobante pago"),
-            BotCommand("help", "mostrar reglas quiniela"),
-            BotCommand("cancelar", "cancelar una accion"),
-            BotCommand("mispuntos", "enviar detalle puntos ultima carrera"),
-            BotCommand("mihistorico", "enviar mis puntos por carrera"),
-            BotCommand("misaldo", "saber cuantas carreras pagadas tengo"),
+conv_teclado = ConversationHandler(
+    entry_points=[
+        CommandHandler("quiniela", inicio_pilotos), 
+        CommandHandler("start", start),
+        CommandHandler("help", help),
+        CommandHandler("quinielas", quinielas),
+        CommandHandler("general", general),
+        CommandHandler("resultados", resultados),
+        CommandHandler("cancelar", cancelar),
+        CommandHandler("proxima", proxima),
+        CommandHandler("mipago", mipago),
+        CommandHandler("pagos", pagos),
+        CommandHandler("revisarpagos", revisarpagos),
+        CommandHandler("mispuntos", mispuntos),
+        CommandHandler("mihistorico", mihistorico),
+        CommandHandler("misaldo", misaldo),
         ],
-        scope=BotCommandScopeAllPrivateChats()
-    )
-    await application.bot.set_my_commands(
-        [
-            BotCommand("quinielas", "quinielas al momento"),
-            BotCommand("resultados", "resultados ultima carrera"),
-            BotCommand("general", "tabla general"),
-            BotCommand("proxima", "cual es la proxima carrera"),
-            BotCommand("pagos", "tabla de pagos"),
-        ], 
-        scope=BotCommandScopeAllGroupChats()
-    )
-    await application.bot.set_my_commands(
-        [
-            BotCommand("start", "empezar el bot"),
-            BotCommand("quiniela", "llenar la quiniela"),
-            BotCommand("mipago", "mandar comprobante pago"),
-            BotCommand("revisarpagos", "revisar pagos pendientes"),
-            BotCommand("help", "mostrar reglas quiniela"),
-            BotCommand("cancelar", "cancelar una accion"),
-            BotCommand("mispuntos", "detalle puntos ultima carrera"),
-            BotCommand("mihistorico", "puntos por carrera"),
-            BotCommand("misaldo", "saber cuantas carreras pagadas tengo"),
-        ],
-        scope=BotCommandScopeChat(controles['tesorero'])
-    )
-    # Set up webserver
-    async def telegram(request: Request) -> Response:
-        """Handle incoming Telegram updates by putting them into the `update_queue`"""
-        # await application.update_queue.put(
-        #     Update.de_json(data=await request.json(), bot=application.bot)
-        # )
-        logger.warning(str(await request.json()))
-        await application.process_update(Update.de_json(data=await request.json(), bot=application.bot))
-        return Response()
-
-    async def health(_: Request) -> PlainTextResponse:
-        """For the health endpoint, reply with a simple plain text message."""
-        return PlainTextResponse(content="The bot is still running fine :)")
-
-    starlette_app = Starlette(
-        routes=[
-            Route("/telegram", telegram, methods=["POST"]),
-            Route("/healthcheck", health, methods=["GET"]),
-        ],
-    )
-    webserver = uvicorn.Server(
-        config=uvicorn.Config(
-            app=starlette_app,
-            port=port,
-            use_colors=False,
-            host="127.0.0.1",
-            # log_level='debug',
-        )
-    )
-
-    # Run application and webserver together
-    async with application:
-        await application.start()
-        await webserver.serve()
-        await application.stop()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    states={
+        # ELEGIR_PILOTOS:[CallbackQueryHandler(elegir_pilotos, pattern=filtropilotos), CallbackQueryHandler(confirmar_pilotos, pattern="^CONFIRMAR$")], 
+        P1:[CallbackQueryHandler(p1, pattern=filtropilotos)],
+        P2:[CallbackQueryHandler(p2, pattern=filtropilotos) ],
+        P3:[CallbackQueryHandler(p3, pattern=filtropilotos) ],
+        P4:[CallbackQueryHandler(p4, pattern=filtropilotos) ],
+        P5:[CallbackQueryHandler(p5, pattern=filtropilotos) ],
+        P6:[CallbackQueryHandler(p6, pattern=filtropilotos) ],
+        P7:[CallbackQueryHandler(p7, pattern=filtropilotos) ],
+        # CONFIRMAR_PILOTOS:[CallbackQueryHandler(confirmar_pilotos, pattern=filtropilotos), CallbackQueryHandler(p7, pattern='^ATRAS$')],
+        GUARDAR_PILOTOS:[CallbackQueryHandler(guardar_pilotos, pattern='^(CONFIRMAR|ATRAS)$')],
+        MENU_AYUDA: [CallbackQueryHandler(reglas, pattern="^" + REGLAS + "$"), CallbackQueryHandler(ayuda, pattern="^" + AYUDA + "$")],
+        PROCESARPAGO: [MessageHandler(filters.Regex('^Revisar$'), revisarpago), MessageHandler(filters.Regex('^Confirmar$'), confirmarpago), MessageHandler(filters.Regex('^Cancelar$'), finpagos)], 
+        PAGOREVISADO: [MessageHandler(filters.Regex('^Si$'), pagorevisado), MessageHandler(filters.Regex('^No$'), revisarpagos)],
+        PAGOCONFIRMADO: [MessageHandler(filters.Regex('^Si$'), pagovalidado), MessageHandler(filters.Regex('^No$'), pagorechazado)],
+        SIGUIENTEPAGOREVISAR: [MessageHandler(filters.Regex('^Si$'), revisarpago), MessageHandler(filters.Regex('^No$'), finpagos)],
+        SIGUIENTEPAGOCONFIRMAR: [MessageHandler(filters.Regex('^Si$'), confirmarpago), MessageHandler(filters.Regex('^No$'), finpagos)],  
+        FINPAGOS: [MessageHandler(filters.Regex('^No$'), finpagos)],
+        GUARDARCOMPROBANTE: [MessageHandler(filters.PHOTO, guardar_comprobante)], 
+        SUBIRCOMPROBANTE: [MessageHandler(filters.Regex('^(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24)$'), subir_comprobante)],
+        },
+    fallbacks=[CommandHandler("cancelar", cancelar)],
+    # fallbacks=[CallbackQueryHandler(cancelar, pattern="cancelar$")],
+    # per_message=True,
+    # name="my_conversation",
+    # persistent=True,
+    # block=False,
+)
+ptb.add_handler(conv_teclado)
