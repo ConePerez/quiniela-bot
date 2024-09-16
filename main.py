@@ -878,6 +878,7 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # register handlers
 
+filtropilotos = '^(PER|VER|NOR|PIA|COL)$'
 conv_teclado = ConversationHandler(
     entry_points=[
         CommandHandler("quiniela", inicio_pilotos), 
