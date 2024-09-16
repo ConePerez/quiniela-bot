@@ -1,5 +1,4 @@
 from PIL import Image, ImageDraw, ImageFont
-from deta import Deta
 from bs4 import BeautifulSoup
 import requests
 from prettytable import PrettyTable
@@ -9,7 +8,6 @@ from operator import itemgetter
 import numpy as np
 import matplotlib.pyplot as plt
 
-deta = Deta()
 
 def poner_fondo_gris(dibujo: ImageDraw.ImageDraw, total_filas: int, largo_fila: int) -> ImageDraw.ImageDraw:
     y = 81.5
@@ -20,8 +18,8 @@ def poner_fondo_gris(dibujo: ImageDraw.ImageDraw, total_filas: int, largo_fila: 
     return dibujo
 
 async def obtener_resultados(url, carrera):
-    dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
-    dbCarreras = deta.AsyncBase('Carreras')
+    # dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
+    # dbCarreras = deta.AsyncBase('Carreras')
     soup = BeautifulSoup(requests.get(url).text)
     table = soup.find('table')
     rows = []
@@ -43,10 +41,10 @@ async def obtener_resultados(url, carrera):
                     }
                 if int(row[6]) > 0:
                     pilotos_con_puntos = pilotos_con_puntos + 1
-    await dbPuntosPilotos.put({'key': carrera, 'Pilotos':posiciones_dict})
-    await dbCarreras.update(updates={'url':url}, key=carrera)
-    await dbPuntosPilotos.close()
-    await dbCarreras.close()
+    # await dbPuntosPilotos.put({'key': carrera, 'Pilotos':posiciones_dict})
+    # await dbCarreras.update(updates={'url':url}, key=carrera)
+    # await dbPuntosPilotos.close()
+    # await dbCarreras.close()
     return posiciones_dict, pilotos_con_puntos
 
 async def archivar_quinielas_participante(carrera):
