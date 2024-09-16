@@ -80,6 +80,7 @@ siguiente_carrera = ''
 dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre','dicembre']
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+tesorero = 6165397411
 
 ptb = (
     Application.builder()
@@ -128,7 +129,7 @@ async def lifespan(_: FastAPI):
             BotCommand("mihistorico", "puntos por carrera"),
             BotCommand("misaldo", "saber cuantas carreras pagadas tengo"),
         ],
-        scope=BotCommandScopeChat(controles['tesorero'])
+        scope=BotCommandScopeChat(tesorero)
     )    
     async with ptb:
         await ptb.start()
