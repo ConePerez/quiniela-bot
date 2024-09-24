@@ -177,15 +177,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     with Session() as sesion:
         with sesion.begin():
             try:
-                telegram_id = Usuario.obtener_usuario_por_telegram_id(sesion, update.message.from_user.id)
-                if not telegram_id:
+                telegram_id = update.message.from_user.id
+                usuario = Usuario.obtener_usuario_por_telegram_id(sesion, telegram_id)
+                if not usuario:
                     telegram_usuario = update.message.from_user
                     usuario_nuevo = Usuario(telegram_id= telegram_usuario.id, nombre=telegram_usuario.name, apellido=telegram_usuario.last_name, nombre_usuario= telegram_usuario.username)
                     sesion.add(usuario_nuevo) 
-
             except:
                 sesion.rollback()
-
             finally:
                 sesion.commit()
                 texto =  "Bienvenido a la quiniela de F1 usa /quiniela para seleccionar a los pilotos del 1-7, /mipago para subir un comprobante de pago y /help para ver la ayuda. En cualquier momento puedes usar /cancelar para cancelar cualquier comando."
@@ -193,7 +192,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     texto, 
                     reply_markup=ReplyKeyboardRemove()
                 )
-                return ConversationHandler.END
+    return ConversationHandler.END
 
 async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Crear tabla con detalle de puntos por carrera de un participante"""

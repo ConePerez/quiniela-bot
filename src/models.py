@@ -29,8 +29,8 @@ class Usuario(Base):
         self.nombre_usuario = nombre_usuario
 
     @staticmethod
-    def obtener_usuario_por_telegram_id(session, telegramid):
-        return session.query(Usuario).filter_by(telegtelegram_id = telegramid).first()
+    def obtener_usuario_por_telegram_id(session, telegram_id):
+        return session.query(Usuario).filter_by(telegtelegram_id = telegram_id).first()
     
 class Quiniela(Base):
     __tablename__ = 'quinielas'
