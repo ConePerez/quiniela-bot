@@ -175,24 +175,18 @@ async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Informar al usuario que es lo que puede hacer"""
     with Session() as sesion:
-        with sesion.begin():
-            try:
-                telegram_id = update.message.from_user.id
-                usuario = Usuario.obtener_usuario_por_telegram_id(sesion, telegram_id)
-                if not usuario:
-                    telegram_usuario = update.message.from_user
-                    usuario_nuevo = Usuario(telegram_id= telegram_usuario.id, nombre=telegram_usuario.name, apellido=telegram_usuario.last_name, nombre_usuario= telegram_usuario.username)
-                    sesion.add(usuario_nuevo) 
-            except:
-                # sesion.rollback()
-                a = "don't do anything"
-            finally:
-                sesion.commit()
-                texto =  "Bienvenido a la quiniela de F1 usa /quiniela para seleccionar a los pilotos del 1-7, /mipago para subir un comprobante de pago y /help para ver la ayuda. En cualquier momento puedes usar /cancelar para cancelar cualquier comando."
-                await update.message.reply_text(
-                    texto, 
-                    reply_markup=ReplyKeyboardRemove()
-                )
+        telegram_id = update.message.from_user.id
+        usuario = Usuario.obtener_usuario_por_telegram_id(sesion, telegram_id)
+        if not usuario:
+            telegram_usuario = update.message.from_user
+            usuario_nuevo = Usuario(telegram_id= telegram_usuario.id, nombre=telegram_usuario.name, apellido=telegram_usuario.last_name, nombre_usuario= telegram_usuario.username)
+            sesion.add(usuario_nuevo) 
+            sesion.commit()
+        texto =  "Bienvenido a la quiniela de F1 usa /quiniela para seleccionar a los pilotos del 1-7, /mipago para subir un comprobante de pago y /help para ver la ayuda. En cualquier momento puedes usar /cancelar para cancelar cualquier comando."
+        await update.message.reply_text(
+            texto, 
+            reply_markup=ReplyKeyboardRemove()
+        )
     return ConversationHandler.END
 
 async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
