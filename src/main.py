@@ -9,7 +9,7 @@ from operator import itemgetter
 from io import BytesIO
 from telegram import __version__ as TG_VER
 from collections import Counter
-from src.utilidades import *
+from utilidades import *
 import numpy as np
 import matplotlib.pyplot as plt
 from models import Usuario, Quiniela, Resultado, Pago, Piloto, PuntosPilotosCarrrera, Carrera
