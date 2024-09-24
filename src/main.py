@@ -9,9 +9,11 @@ from operator import itemgetter
 from io import BytesIO
 from telegram import __version__ as TG_VER
 from collections import Counter
-from utilidades import *
+from src.utilidades import *
 import numpy as np
 import matplotlib.pyplot as plt
+from models import Usuario, Quiniela, Resultado, Pago, Piloto, PuntosPilotosCarrrera, Carrera
+from base import Session
 
 from contextlib import asynccontextmanager
 from http import HTTPStatus
@@ -170,13 +172,26 @@ async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Informar al usuario que es lo que puede hacer"""
-    logger.warning('Entro a start')
-    texto =  "Bienvenido a la quiniela de F1 usa /quiniela para seleccionar a los pilotos del 1-7, /mipago para subir un comprobante de pago y /help para ver la ayuda. En cualquier momento puedes usar /cancelar para cancelar cualquier comando."
-    await update.message.reply_text(
-        texto, 
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return ConversationHandler.END
+    with Session() as sesion:
+        with sesion.begin():
+            try:
+                telegram_id = Usuario.obtener_usuario_por_telegram_id(sesion, update.message.from_user.id)
+                if not telegram_id:
+                    telegram_usuario = update.message.from_user
+                    usuario_nuevo = Usuario(telegram_id= telegram_usuario.id, nombre=telegram_usuario.name, apellido=telegram_usuario.last_name, nombre_usuario= telegram_usuario.username)
+                    sesion.add(usuario_nuevo) 
+
+            except:
+                sesion.rollback()
+
+            finally:
+                sesion.commit()
+                texto =  "Bienvenido a la quiniela de F1 usa /quiniela para seleccionar a los pilotos del 1-7, /mipago para subir un comprobante de pago y /help para ver la ayuda. En cualquier momento puedes usar /cancelar para cancelar cualquier comando."
+                await update.message.reply_text(
+                    texto, 
+                    reply_markup=ReplyKeyboardRemove()
+                )
+                return ConversationHandler.END
 
 async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Crear tabla con detalle de puntos por carrera de un participante"""
