@@ -184,7 +184,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     usuario_nuevo = Usuario(telegram_id= telegram_usuario.id, nombre=telegram_usuario.name, apellido=telegram_usuario.last_name, nombre_usuario= telegram_usuario.username)
                     sesion.add(usuario_nuevo) 
             except:
-                sesion.rollback()
+                # sesion.rollback()
+                a = "don't do anything"
             finally:
                 sesion.commit()
                 texto =  "Bienvenido a la quiniela de F1 usa /quiniela para seleccionar a los pilotos del 1-7, /mipago para subir un comprobante de pago y /help para ver la ayuda. En cualquier momento puedes usar /cancelar para cancelar cualquier comando."
