@@ -13,7 +13,7 @@ from utilidades import *
 import numpy as np
 import matplotlib.pyplot as plt
 from models import Usuario, Quiniela, Resultado, Pago, Piloto, PuntosPilotosCarrrera, Carrera
-from base import Session
+from base import engine, Base, Session
 
 from contextlib import asynccontextmanager
 from http import HTTPStatus
@@ -83,6 +83,8 @@ dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'd
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre','dicembre']
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
 tesorero = '5895888783'
+# create all tabless
+Base.metadata.create_all(engine)
 
 ptb = (
     Application.builder()
