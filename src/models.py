@@ -66,7 +66,7 @@ class PuntosPilotosCarrrera(Base):
 class Carrera(Base):
     __tablename__ = 'carreras'
 
-    id = Column()
+    id = Column(Integer, primary_key=True)
     codigo = Column(Integer)
     nombre = Column(String)
     hora_empiezo = Column(TIMESTAMP)
