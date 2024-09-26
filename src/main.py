@@ -907,6 +907,7 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             quiniela.carrera_id = carrera_quiniela_id
             quiniela.fecha_hora = now
             quiniela.lista = data
+        sesion.commit()
     texto = "Tu lista para la carrera " + carrera_quiniela + " se ha guardado en la base de datos. Quedo de la siguiente manera:\n"
     for index, codigo in enumerate(context.user_data['Lista']):
         texto = texto + 'P' + str(index + 1) + ' ' + codigo + '\n'
