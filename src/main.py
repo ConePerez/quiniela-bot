@@ -591,14 +591,15 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     with Session() as sesion:
         pilotos = Piloto.obtener_pilotos(sesion)
         carrera_quiniela =  sesion.query(Carrera).filter(or_(Carrera.estado == 'IDLE', Carrera.estado == 'EN-CURSO')).first()
-        sesiones_carrera_quiniela = carrera_quiniela.sesionescarrera
-        for sesion_carrera in carrera_quiniela.sesionescarrera:
-            if sesion_carrera.codigo == 'q':
-                horario_qualy = sesion_carrera.hora_empiezo    
+        if carrera_quiniela:
+            sesiones_carrera_quiniela = carrera_quiniela.sesionescarrera
+            for sesion_carrera in carrera_quiniela.sesionescarrera:
+                if sesion_carrera.codigo == 'q':
+                    horario_qualy = sesion_carrera.hora_empiezo    
     # puntospilotos = dbPuntosPilotos.fetch()
     # pilotoslista = dbPilotos.get('2024')['Lista']
     # carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
-    if carrera_quiniela is None:
+    if not carrera_quiniela:
         await update.message.reply_text(
                 'Aun no tengo los datos para la siguiente carrera, espera un dia despues que termino la ultima carrera, para mandar la quiniela de la proxima.'
                 )
