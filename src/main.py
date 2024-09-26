@@ -918,12 +918,12 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # register handlers
 
-filtropilotos = ''
+filtropilotos = 'NADA|ATRAS'
 with Session() as sesion:
     pilotos = sesion.query(Piloto).all()
     for piloto in pilotos:
-        filtropilotos = filtropilotos + piloto.codigo + "|"
-filtropilotos = '^(' + filtropilotos[:-1] + ')$'
+        filtropilotos = filtropilotos + "|" + piloto.codigo
+filtropilotos = '^(' + filtropilotos + ')$'
 logger.info(filtropilotos)
 conv_teclado = ConversationHandler(
     entry_points=[
