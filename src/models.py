@@ -53,6 +53,10 @@ class Piloto(Base):
     acumulado_puntos = Column(Double)
     puntospiloto = relationship("PuntosPilotosCarrrera", backref=backref("pilotos"))
 
+    @staticmethod
+    def obtener_pilotos(session):
+        return session.query(Piloto).all()
+
 class PuntosPilotosCarrrera(Base):
     __tablename__ = 'puntospilotoscarrera'
 

@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from models import Usuario, Quiniela, Resultado, Pago, Piloto, PuntosPilotosCarrrera, Carrera
 from base import engine, Base, Session
+from sqlalchemy import or_
 
 from contextlib import asynccontextmanager
 from http import HTTPStatus
@@ -584,15 +585,29 @@ async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['Lista'] = []
-    puntospilotos = dbPuntosPilotos.fetch()
-    pilotoslista = dbPilotos.get('2024')['Lista']
-    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
-    if carrera_quiniela.count == 0:
+    pilotos = None
+    carrera_quiniela = None
+    sesiones_carrera_quiniela = None
+    with Session() as sesion:
+        pilotos = Piloto.obtener_pilotos(sesion)
+        carrera_quiniela =  sesion.query(Carrera).filter(or_(Carrera.estado == 'IDLE', Carrera.estado == 'EN-CURSO')).first()
+        sesiones_carrera_quiniela = carrera_quiniela.sesionescarrera
+        for sesion_carrera in carrera_quiniela.sesionescarrera:
+            if sesion_carrera.codigo == 'q':
+                horario_qualy = sesion_carrera.hora_empiezo    
+    # puntospilotos = dbPuntosPilotos.fetch()
+    # pilotoslista = dbPilotos.get('2024')['Lista']
+    # carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    if carrera_quiniela is None:
         await update.message.reply_text(
                 'Aun no tengo los datos para la siguiente carrera, espera un dia despues que termino la ultima carrera, para mandar la quiniela de la proxima.'
                 )
         return ConversationHandler.END
-    horario_qualy = datetime.fromisoformat(carrera_quiniela.items[0]['q']['hora_empiezo'])
+    # horario_qualy = datetime.fromisoformat(carrera_quiniela.items[0]['q']['hora_empiezo'])
+    horario_qualy = None
+    for sesion_carrera in sesiones_carrera_quiniela:
+            if sesion_carrera.codigo == 'q':
+                horario_qualy = sesion_carrera.hora_empiezo
     ahora = datetime.now()
     ahora = ahora.astimezone()
     if(ahora > horario_qualy):
@@ -600,25 +615,26 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'Ya no se puede modificar o ingresar una quiniela porque la qualy ya empezo. Si no metiste quiniela, se te penalizara con base a las reglas. Usa /help para ver las reglas.'
             )
         return ConversationHandler.END
-    for carrera in puntospilotos.items:
-        for piloto in carrera['Pilotos']:
-            pilotoslista[piloto]['AcumuladoPuntos'] = pilotoslista[piloto]['AcumuladoPuntos'] + carrera['Pilotos'][piloto]['puntos']
-    pilotoslista = sorted(pilotoslista.items(), key=lambda item: item[1]['AcumuladoPuntos'], reverse=True)
+    # for carrera in puntospilotos.items:
+    #     for piloto in carrera['Pilotos']:
+    #         pilotoslista[piloto]['AcumuladoPuntos'] = pilotoslista[piloto]['AcumuladoPuntos'] + carrera['Pilotos'][piloto]['puntos']
+    # pilotoslista = sorted(pilotoslista.items(), key=lambda item: item[1]['AcumuladoPuntos'], reverse=True)
     # context.user_data['ListaPilotosOrdenada'] = pilotoslista
+    pilotos.sort(key=lambda x: x.codigo, reverse=True)
     COLUMNAS = 5
     keyboard = []
     cuenta_columnas = COLUMNAS
-    for pilotonumer in pilotoslista:
+    for piloto in pilotos:
         if COLUMNAS == cuenta_columnas:
             keyboard.append([])
             cuenta_columnas = 0
-        keyboard[len(keyboard) - 1].append(InlineKeyboardButton(pilotonumer[1]['codigo'], callback_data=pilotonumer[1]['codigo']))
+        keyboard[len(keyboard) - 1].append(InlineKeyboardButton(piloto.codigo, callback_data=piloto.codigo))
         cuenta_columnas = cuenta_columnas + 1
     if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
         for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
             keyboard[len(keyboard) - 1].append(InlineKeyboardButton(' ', callback_data='NADA'))
     reply_markup = InlineKeyboardMarkup(keyboard)
-    nombre_carrera = carrera_quiniela.items[0]['Nombre']
+    nombre_carrera = carrera_quiniela.nombre
     await update.message.reply_text("Usando los botones de abajo, ve escogiendo los pilotos del P1 a P7 para la carrera: " + nombre_carrera, reply_markup=reply_markup)
     return P1
 
@@ -891,7 +907,13 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # register handlers
 
-filtropilotos = '^(PER|VER|NOR|PIA|COL)$'
+filtropilotos = ''
+with Session() as sesion:
+    pilotos = sesion.query(Piloto).all()
+    for piloto in pilotos:
+        filtropilotos = filtropilotos + piloto.codigo + "|"
+filtropilotos = '^(' + filtropilotos[:-1] + ')$'
+logger.info(filtropilotos)
 conv_teclado = ConversationHandler(
     entry_points=[
         CommandHandler("quiniela", inicio_pilotos), 
