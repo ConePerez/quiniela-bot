@@ -592,10 +592,7 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         pilotos = Piloto.obtener_pilotos(sesion)
         carrera_quiniela =  sesion.query(Carrera).filter(or_(Carrera.estado == 'IDLE', Carrera.estado == 'EN-CURSO')).first()
         if carrera_quiniela:
-            sesiones_carrera_quiniela = carrera_quiniela.sesionescarrera
-            for sesion_carrera in carrera_quiniela.sesionescarrera:
-                if sesion_carrera.codigo == 'q':
-                    horario_qualy = sesion_carrera.hora_empiezo    
+            sesiones_carrera_quiniela = carrera_quiniela.sesionescarrera    
     # puntospilotos = dbPuntosPilotos.fetch()
     # pilotoslista = dbPilotos.get('2024')['Lista']
     # carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
@@ -636,12 +633,14 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             keyboard[len(keyboard) - 1].append(InlineKeyboardButton(' ', callback_data='NADA'))
     reply_markup = InlineKeyboardMarkup(keyboard)
     nombre_carrera = carrera_quiniela.nombre
+    context.user_data['NombreCarrera'] = nombre_carrera
+    context.user_data['ID_Carrera'] = carrera_quiniela.id
     await update.message.reply_text("Usando los botones de abajo, ve escogiendo los pilotos del P1 a P7 para la carrera: " + nombre_carrera, reply_markup=reply_markup)
     return P1
 
 async def p1(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     hay_boton_atras = False
-    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    carrera_quiniela = context.user_data['NombreCarrera']
     query = update.callback_query
     await query.answer()
     if query.data == 'NADA':
@@ -666,7 +665,7 @@ async def p1(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
                 teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
     teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
     reply_markup = InlineKeyboardMarkup(teclado)
-    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
     await query.edit_message_text(text=texto, reply_markup=reply_markup)       
     if query.data == 'ATRAS':
         await query.edit_message_text(text='Vuelve a empezar con el comando /quiniela')
@@ -674,7 +673,7 @@ async def p1(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     return P2
 
 async def p2(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    carrera_quiniela = context.user_data['NombreCarrera']
     query = update.callback_query
     await query.answer()
     if query.data == 'NADA':
@@ -699,14 +698,14 @@ async def p2(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
                 teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))    
     teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
     reply_markup = InlineKeyboardMarkup(teclado)
-    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
     await query.edit_message_text(text=texto, reply_markup=reply_markup)       
     if query.data == 'ATRAS':
         return P1
     return P3
 
 async def p3(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    carrera_quiniela = context.user_data['NombreCarrera']
     query = update.callback_query
     await query.answer()
     if query.data == 'NADA':
@@ -731,14 +730,14 @@ async def p3(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
                 teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))    
     teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
     reply_markup = InlineKeyboardMarkup(teclado)
-    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
     await query.edit_message_text(text=texto, reply_markup=reply_markup)       
     if query.data == 'ATRAS':
         return P2
     return P4
 
 async def p4(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    carrera_quiniela = context.user_data['NombreCarrera']
     query = update.callback_query
     await query.answer()
     if query.data == 'NADA':
@@ -763,14 +762,14 @@ async def p4(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
                 teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
     teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
     reply_markup = InlineKeyboardMarkup(teclado)
-    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
     await query.edit_message_text(text=texto, reply_markup=reply_markup)       
     if query.data == 'ATRAS':
         return P3
     return P5
 
 async def p5(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    carrera_quiniela = context.user_data['NombreCarrera']
     query = update.callback_query
     await query.answer()
     if query.data == 'NADA':
@@ -795,14 +794,14 @@ async def p5(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
                 teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
     teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
     reply_markup = InlineKeyboardMarkup(teclado)
-    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
     await query.edit_message_text(text=texto, reply_markup=reply_markup)       
     if query.data == 'ATRAS':
         return P4
     return P6
 
 async def p6(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    carrera_quiniela = context.user_data['NombreCarrera']
     query = update.callback_query
     await query.answer()
     if query.data == 'NADA':
@@ -827,14 +826,14 @@ async def p6(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
                 teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
     teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
     reply_markup = InlineKeyboardMarkup(teclado)
-    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
     await query.edit_message_text(text=texto, reply_markup=reply_markup)       
     if query.data == 'ATRAS':
         return P5
     return P7
 
 async def p7(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
-    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    carrera_quiniela = context.user_data['NombreCarrera']
     query = update.callback_query
     await query.answer()
     if query.data == 'NADA':
@@ -861,7 +860,7 @@ async def p7(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     if not query.data == 'ATRAS':
         teclado.append([InlineKeyboardButton("Confirmar", callback_data='CONFIRMAR')])
     reply_markup = InlineKeyboardMarkup(teclado)
-    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+    texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
     await query.edit_message_text(text=texto, reply_markup=reply_markup)       
     if query.data == 'ATRAS':
         return P6
@@ -870,7 +869,8 @@ async def p7(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
 async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
+    carrera_quiniela = context.user_data['NombreCarrera']
+    carrera_quiniela_id = context.user_data['ID_Carrera']
     if query.data == 'ATRAS':
         codigo_eliminado = context.user_data['Lista'].pop()
         teclado = []
@@ -887,7 +887,7 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
         teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
         reply_markup = InlineKeyboardMarkup(teclado)
-        texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela.items[0]['Nombre'] + ':\n' + ",".join(context.user_data['Lista'])
+        texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
         await query.edit_message_text(text=texto, reply_markup=reply_markup)
         return P7
     user = query.from_user
@@ -897,8 +897,17 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     apellido = ''
     if(user.last_name is not None):
         apellido = ' ' + user.last_name
-    dbQuiniela.put({"Carrera": carrera_quiniela.items[0]['key'], "Lista": data, "FechaHora":now.isoformat(), "Nombre":user.first_name + apellido, "key": str(user.id)})
-    texto = "Tu lista para la carrera " + carrera_quiniela.items[0]['Nombre'] + " se ha guardado en la base de datos. Quedo de la siguiente manera:\n"
+    with Session() as sesion:
+        usuario = Usuario.obtener_usuario_por_telegram_id(sesion, user.id)
+        quiniela = sesion.query(Quiniela).filter(Quiniela.usuario_id == usuario.id).first()
+        if not quiniela:
+            nueva_quiniela = Quiniela(usuario_id=usuario.id, carrera_id= carrera_quiniela_id, fecha_hora=now, lista=data)
+            sesion.add(nueva_quiniela)
+        else:
+            quiniela.carrera_id = carrera_quiniela_id
+            quiniela.fecha_hora = now
+            quiniela.lista = data
+    texto = "Tu lista para la carrera " + carrera_quiniela + " se ha guardado en la base de datos. Quedo de la siguiente manera:\n"
     for index, codigo in enumerate(context.user_data['Lista']):
         texto = texto + 'P' + str(index + 1) + ' ' + codigo + '\n'
     if len(context.user_data['Lista']) > 7:

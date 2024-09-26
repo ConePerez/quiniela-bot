@@ -41,6 +41,12 @@ class Quiniela(Base):
     fecha_hora = Column(TIMESTAMP)
     lista = Column(String)
 
+    def __init__(self, usuario_id, carrera_id, fecha_hora, lista):
+        self.usuario_id = usuario_id
+        self.carrera_id = carrera_id
+        self.fecha_hora = fecha_hora
+        self.lista = lista
+
 class Piloto(Base):
     __tablename__ = 'pilotos'
 
