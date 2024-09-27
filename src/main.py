@@ -867,37 +867,38 @@ async def p7(update:Update, context:ContextTypes.DEFAULT_TYPE) -> int:
     return GUARDAR_PILOTOS
 
 async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-    carrera_quiniela = context.user_data['NombreCarrera']
-    carrera_quiniela_id = context.user_data['ID_Carrera']
-    if query.data == 'ATRAS':
-        codigo_eliminado = context.user_data['Lista'].pop()
-        teclado = []
-        for fila in update.effective_message.reply_markup.inline_keyboard:
-            teclado.append([])
-            if len(fila) == 5:
-                for boton in fila:
-                    texto = boton.text
-                    if len(texto) > 3:
-                        texto = boton.text[3:]
-                    if texto in context.user_data['Lista']:
-                        posicion = str(context.user_data['Lista'].index(texto) + 1)
-                        texto = 'P' + posicion + ' ' + texto
-                    teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
-        teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
-        reply_markup = InlineKeyboardMarkup(teclado)
-        texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
-        await query.edit_message_text(text=texto, reply_markup=reply_markup)
-        return P7
-    user = query.from_user
-    data = ",".join(context.user_data['Lista'])
-    now = datetime.now()
-    now = now.astimezone()
-    apellido = ''
-    if(user.last_name is not None):
-        apellido = ' ' + user.last_name
     with Session() as sesion:
+        query = update.callback_query
+        await query.answer()
+        carrera_quiniela = context.user_data['NombreCarrera']
+        carrera_quiniela_id = context.user_data['ID_Carrera']
+        if query.data == 'ATRAS':
+            codigo_eliminado = context.user_data['Lista'].pop()
+            teclado = []
+            for fila in update.effective_message.reply_markup.inline_keyboard:
+                teclado.append([])
+                if len(fila) == 5:
+                    for boton in fila:
+                        texto = boton.text
+                        if len(texto) > 3:
+                            texto = boton.text[3:]
+                        if texto in context.user_data['Lista']:
+                            posicion = str(context.user_data['Lista'].index(texto) + 1)
+                            texto = 'P' + posicion + ' ' + texto
+                        teclado[len(teclado) - 1].append(InlineKeyboardButton(text= texto, callback_data=boton.callback_data))
+            teclado.append([InlineKeyboardButton("Atras", callback_data='ATRAS')])
+            reply_markup = InlineKeyboardMarkup(teclado)
+            texto = 'Asi va tu lista de pilotos (de P1 a P7) para la carrera ' + carrera_quiniela + ':\n' + ",".join(context.user_data['Lista'])
+            await query.edit_message_text(text=texto, reply_markup=reply_markup)
+            return P7
+        user = query.from_user
+        data = ",".join(context.user_data['Lista'])
+        now = datetime.now()
+        now = now.astimezone()
+        apellido = ''
+        if(user.last_name is not None):
+            apellido = ' ' + user.last_name
+    
         usuario = Usuario.obtener_usuario_por_telegram_id(sesion, user.id)
         quiniela = sesion.query(Quiniela).filter(Quiniela.usuario_id == usuario.id).first()
         if not quiniela:
@@ -908,12 +909,12 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             quiniela.fecha_hora = now
             quiniela.lista = data
         sesion.commit()
-    texto = "Tu lista para la carrera " + carrera_quiniela + " se ha guardado en la base de datos. Quedo de la siguiente manera:\n"
-    for index, codigo in enumerate(context.user_data['Lista']):
-        texto = texto + 'P' + str(index + 1) + ' ' + codigo + '\n'
-    if len(context.user_data['Lista']) > 7:
-        texto = 'Hubo un error en la captura, mas de 7 pilotos entraron en tu quiniela. Por favor vuelve con el comando /quiniela a meter una captura.'
-    await query.edit_message_text(text=texto)
+        texto = "Tu lista para la carrera " + carrera_quiniela + " se ha guardado en la base de datos. Quedo de la siguiente manera:\n"
+        for index, codigo in enumerate(context.user_data['Lista']):
+            texto = texto + 'P' + str(index + 1) + ' ' + codigo + '\n'
+        if len(context.user_data['Lista']) > 7:
+            texto = 'Hubo un error en la captura, mas de 7 pilotos entraron en tu quiniela. Por favor vuelve con el comando /quiniela a meter una captura.'
+        await query.edit_message_text(text=texto)
     return ConversationHandler.END
 
     # register handlers
