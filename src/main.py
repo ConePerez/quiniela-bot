@@ -156,11 +156,17 @@ async def test():
     return "esto es una prueba"
 
 async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    usuario = str(update.message.from_user.id)
-    # pagos_usuario = dbPagos.fetch([{'usuario':usuario, 'estado':'guardado'},{'usuario':usuario, 'estado':'confirmado'}])
+    telegram_usuario = update.message.from_user
     pagos_guardados = 0
     pagos_confirmados = 0
     carreras = 0
+    with Session() as sesion:
+        usuario = Usuario.obtener_usuario_por_telegram_id(telegram_id=telegram_usuario.id, session=sesion)
+        pagos_confirmados, pagos_guardados = pagos_usuario(usuario_pagos=usuario.pagos)
+        carreras = len(sesion.query(Carrera).all())
+    # pagos_usuario = dbPagos.fetch([{'usuario':usuario, 'estado':'guardado'},{'usuario':usuario, 'estado':'confirmado'}])
+    
+    # carreras = 0
     # for pago in pagos_usuario.items:
     #     pagos_guardados += int(pago['carreras'])
     #     if pago['estado'] == 'confirmado':
