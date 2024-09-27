@@ -416,7 +416,7 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         #         keyboard[len(keyboard) - 1].append('')
 
         
-        nuevo_pago = Pago(fecha_hora=ahora, usuario_id=user.id, carreras=0, enviado=False, estado='creado', foto='', mensaje='', texto='0')
+        nuevo_pago = Pago(fecha_hora=ahora, usuario_id=usuario.id, carreras=0, enviado=False, estado='creado', foto='', mensaje='', texto='0')
         sesion.add(nuevo_pago)
         sesion.commit()
         context.user_data["pago_id"] = nuevo_pago.id

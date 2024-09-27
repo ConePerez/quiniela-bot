@@ -38,7 +38,7 @@ class Quiniela(Base):
     id = Column(Integer, primary_key=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     carrera_id = Column(Integer, ForeignKey("carreras.id"))
-    fecha_hora = Column(TIMESTAMP)
+    fecha_hora = Column(TIMESTAMP(timezone=True))
     lista = Column(String)
 
     def __init__(self, usuario_id, carrera_id, fecha_hora, lista):
@@ -79,8 +79,8 @@ class Carrera(Base):
     id = Column(Integer, primary_key=True)
     codigo = Column(Integer)
     nombre = Column(String)
-    hora_empiezo = Column(TIMESTAMP)
-    hora_termino = Column(TIMESTAMP)
+    hora_empiezo = Column(TIMESTAMP(timezone=True))
+    hora_termino = Column(TIMESTAMP(timezone=True))
     estado = Column(String)
     ronda = Column(Integer)
     url = Column(String)
@@ -96,8 +96,8 @@ class SesionCarrera(Base):
     codigo = Column(String)
     carrera_id = Column(Integer, ForeignKey("carreras.id"))
     estado = Column(String)
-    hora_empiezo = Column(TIMESTAMP)
-    hora_termino = Column(TIMESTAMP)
+    hora_empiezo = Column(TIMESTAMP(timezone=True))
+    hora_termino = Column(TIMESTAMP(timezone=True))
 
 
 class Resultado(Base):
@@ -114,7 +114,7 @@ class Pago(Base):
     __tablename__ = 'pagos'
 
     id = Column(Integer, primary_key=True)
-    fecha_hora = Column(TIMESTAMP)
+    fecha_hora = Column(TIMESTAMP(timezone=True))
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     carreras = Column(Integer)
     enviado = Column(Boolean)
