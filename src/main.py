@@ -350,26 +350,38 @@ async def guardar_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE)
     photo_id = update.message.photo[-1].file_id
     mensaje = update.effective_message.id
     mensaje_texto = ''
+    pago_id = context.user_data["pago_id"]
     if update.effective_message.caption is None:
         mensaje_texto = 'Sin mensaje'
     else:
         mensaje_texto = update.effective_message.caption
     usuario = update.message.from_user.first_name
-    dbPagos.update(updates={'foto':photo_id, 'estado':'guardado', 'mensaje':mensaje, 'texto':mensaje_texto, 'nombre':usuario}, key=context.user_data["fecha"])
-    await update.message.reply_text(
-        "Tu pago se ha guardado por " + context.user_data["pago_carreras"] + " carreras" +  ". El tesorero va a revisar la foto del comprobante para confirmarlo",
-        reply_markup=ReplyKeyboardRemove()
-    )
+    with Session() as sesion:
+        pago = sesion.get(Pago, pago_id)
+        pago.foto = photo_id
+        pago.estado = 'guardado'
+        pago.mensaje = mensaje
+        pago.texto = mensaje_texto
+    # dbPagos.update(updates={'foto':photo_id, 'estado':'guardado', 'mensaje':mensaje, 'texto':mensaje_texto, 'nombre':usuario}, key=context.user_data["fecha"])
+        await update.message.reply_text(
+            "Tu pago se ha guardado por " + context.user_data["pago_carreras"] + " carreras" +  ". El tesorero va a revisar la foto del comprobante para confirmarlo",
+            reply_markup=ReplyKeyboardRemove()
+        )
     return ConversationHandler.END
 
 async def subir_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.message.from_user
     context.user_data["pago_carreras"] = update.message.text
-    dbPagos.update(updates={'carreras':context.user_data["pago_carreras"], 'estado':'sinfoto'}, key=context.user_data["fecha"])
-    await update.message.reply_text(
-        "Sube la foto del comprobante de pago de las " + context.user_data["pago_carreras"] + ' carreras',
-        reply_markup=ReplyKeyboardRemove()
-    )
+    # dbPagos.update(updates={'carreras':context.user_data["pago_carreras"], 'estado':'sinfoto'}, key=context.user_data["fecha"])
+    pago_id = context.user_data["pago_id"]
+    with Session() as sesion:
+        pago = sesion.get(Pago, pago_id)
+        pago.carreras = int(context.user_data["pago_carreras"])
+        pago.estado = 'sinfoto'
+        await update.message.reply_text(
+            "Sube la foto del comprobante de pago de las " + context.user_data["pago_carreras"] + ' carreras',
+            reply_markup=ReplyKeyboardRemove()
+        )
     return GUARDARCOMPROBANTE
 
 async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -377,37 +389,44 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ahora = datetime.now()
     ahora = ahora.astimezone()
     ahora_gdl = ahora.astimezone(pytz.timezone('America/Mexico_City'))
-    pagos_guardados, pagos_confirmados = await pagos_usuario(str(user.id))
-    controles = dbConfiguracion.get('controles')
-    resto = int(controles['rondas']) - pagos_guardados
-    if resto == 0:
-        await update.message.reply_text(
-            'Ya cubriste todas las carresas. Puedes meter tu /quiniela sin problema.',
-            reply_markup=ReplyKeyboardRemove()
-        )
-        return ConversationHandler.END
-    COLUMNAS = 5
-    keyboard = []
-    cuenta_columnas = COLUMNAS
-    for boton in range(resto):
-        if COLUMNAS == cuenta_columnas:
-            keyboard.append([])
-            cuenta_columnas = 0
-        keyboard[len(keyboard) - 1].append(str(boton + 1))
-        cuenta_columnas = cuenta_columnas + 1
-    # if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
-    #     for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
-    #         keyboard[len(keyboard) - 1].append('')
+    usuario_pagos = None
+    with Session() as sesion:
+        usuario = Usuario.obtener_usuario_por_telegram_id(user.id)
+        usuario_pagos = usuario.pagos
+        pagos_guardados, pagos_confirmados = await pagos_usuario(usuario_pagos)
+        # controles = dbConfiguracion.get('controles')
+        resto = 24 - pagos_guardados
+        if resto == 0:
+            await update.message.reply_text(
+                'Ya cubriste todas las carresas. Puedes meter tu /quiniela sin problema.',
+                reply_markup=ReplyKeyboardRemove()
+            )
+            return ConversationHandler.END
+        COLUMNAS = 5
+        keyboard = []
+        cuenta_columnas = COLUMNAS
+        for boton in range(resto):
+            if COLUMNAS == cuenta_columnas:
+                keyboard.append([])
+                cuenta_columnas = 0
+            keyboard[len(keyboard) - 1].append(str(boton + 1))
+            cuenta_columnas = cuenta_columnas + 1
+        # if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
+        #     for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
+        #         keyboard[len(keyboard) - 1].append('')
 
-    context.user_data["fecha"] = ahora_gdl.isoformat()
-    dbPagos.put({'key': context.user_data["fecha"], 'usuario':str(user.id) , 'carreras':'' , 'foto':'' , 'estado':'creado', 'enviado':False})
-    await update.message.reply_text(
-        '¿Cuantas carreras vas a cubrir con el comprobante de pago?', 
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard, 
-            one_time_keyboard=True, 
-            input_field_placeholder="Numero de carreras:")
-        )
+        
+        nuevo_pago = Pago(fecha_hora=ahora, usuario_id=user.id, carreras=0, enviado=False, estado='creado', foto='', mensaje='', texto='0')
+        sesion.add(nuevo_pago)
+        sesion.commit()
+        context.user_data["pago_id"] = nuevo_pago.id
+        await update.message.reply_text(
+            '¿Cuantas carreras vas a cubrir con el comprobante de pago?', 
+            reply_markup=ReplyKeyboardMarkup(
+                keyboard, 
+                one_time_keyboard=True, 
+                input_field_placeholder="Numero de carreras:")
+            )
     return SUBIRCOMPROBANTE
 
 async def revisarpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:

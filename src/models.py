@@ -122,3 +122,13 @@ class Pago(Base):
     foto = Column(String)
     mensaje = Column(String)
     texto = Column(String)
+
+    def __init__(self, fecha_hora, usuario_id, carreras, enviado, estado, foto, mensaje, texto):
+        self.fecha_hora = fecha_hora
+        self.usuario_id = usuario_id
+        self.carreras = carreras
+        self.enviado = enviado
+        self.estado = estado
+        self.foto = foto
+        self.mensaje = mensaje
+        self.texto = texto
