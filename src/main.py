@@ -162,7 +162,7 @@ async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     carreras = 0
     with Session() as sesion:
         usuario = Usuario.obtener_usuario_por_telegram_id(telegram_id=telegram_usuario.id, session=sesion)
-        pagos_confirmados, pagos_guardados = pagos_usuario(usuario_pagos=usuario.pagos)
+        pagos_guardados, pagos_confirmados = pagos_usuario(usuario_pagos=usuario.pagos)
         carreras = len(sesion.query(Carrera).all())
     # pagos_usuario = dbPagos.fetch([{'usuario':usuario, 'estado':'guardado'},{'usuario':usuario, 'estado':'confirmado'}])
     
@@ -401,7 +401,7 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     with Session() as sesion:
         usuario = Usuario.obtener_usuario_por_telegram_id(session=sesion, telegram_id=user.id)
         usuario_pagos = usuario.pagos
-        pagos_guardados, pagos_confirmados = await pagos_usuario(usuario_pagos)
+        pagos_guardados, pagos_confirmados = pagos_usuario(usuario_pagos)
         # controles = dbConfiguracion.get('controles')
         resto = 24 - pagos_guardados
         if resto == 0:

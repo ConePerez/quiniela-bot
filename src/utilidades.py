@@ -437,7 +437,7 @@ async def detalle_individual_puntos(usuario):
     
     return im, texto_mensaje
 
-async def pagos_usuario(usuario_pagos):
+def pagos_usuario(usuario_pagos):
     # dbPagos = deta.AsyncBase('Pagos')
     # pagos_usuario = await dbPagos.fetch([{'usuario':usuario, 'estado':'guardado'},{'usuario':usuario, 'estado':'confirmado'}])
     # await dbPagos.close()
