@@ -391,7 +391,7 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ahora_gdl = ahora.astimezone(pytz.timezone('America/Mexico_City'))
     usuario_pagos = None
     with Session() as sesion:
-        usuario = Usuario.obtener_usuario_por_telegram_id(user.id)
+        usuario = Usuario.obtener_usuario_por_telegram_id(session=sesion, telegram_id=user.id)
         usuario_pagos = usuario.pagos
         pagos_guardados, pagos_confirmados = await pagos_usuario(usuario_pagos)
         # controles = dbConfiguracion.get('controles')
