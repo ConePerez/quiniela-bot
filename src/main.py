@@ -362,6 +362,7 @@ async def guardar_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE)
         pago.estado = 'guardado'
         pago.mensaje = mensaje
         pago.texto = mensaje_texto
+        sesion.commit()
     # dbPagos.update(updates={'foto':photo_id, 'estado':'guardado', 'mensaje':mensaje, 'texto':mensaje_texto, 'nombre':usuario}, key=context.user_data["fecha"])
         await update.message.reply_text(
             "Tu pago se ha guardado por " + context.user_data["pago_carreras"] + " carreras" +  ". El tesorero va a revisar la foto del comprobante para confirmarlo",
@@ -378,6 +379,7 @@ async def subir_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE) -
         pago = sesion.get(Pago, pago_id)
         pago.carreras = int(context.user_data["pago_carreras"])
         pago.estado = 'sinfoto'
+        sesion.commit()
         await update.message.reply_text(
             "Sube la foto del comprobante de pago de las " + context.user_data["pago_carreras"] + ' carreras',
             reply_markup=ReplyKeyboardRemove()
