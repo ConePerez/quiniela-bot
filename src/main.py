@@ -262,28 +262,32 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Comando para desplegar la informacion de la siguiente carrera"""
     # proxima_Carrera = dbCarreras.fetch([{'Estado':'IDLE'},{'Estado':'EN-CURSO'}])
-    if(proxima_Carrera.count == 0):
+    proxima_carrera = None
+    sesiones_carrera_quiniela = None
+    with Session() as sesion:
+        proxima_carrera = sesion.query(Carrera).filter(or_(Carrera.estado == "IDLE", Carrera.estado == "EN-CURSO")).first()
+        if proxima_carrera:
+            sesiones_carrera_quiniela = proxima_carrera.sesionescarrera
+    if not proxima_carrera:
         await update.message.reply_text(
             'Todavia no se actualiza mi base de datos con la proxima carrera. Por lo general se actualiza un dia despues de que termino la ultima carrera.'
         )
         return ConversationHandler.END
-    proxima_nombre = proxima_Carrera.items[0]['Nombre']
+    proxima_nombre = proxima_carrera.nombre
     for char in MARKDOWN_SPECIAL_CHARS:
         if char in proxima_nombre:
             proxima_nombre = proxima_nombre.replace(char, "\\" + char)
     respuesta = "*" + proxima_nombre + "* \n"
-    orden_horarios = ['p1', 'p2', 'p3', 'q', 'r']
     texto_sesion = {'p1':'P1', 'p2':'P2', 'p3':'P3', 'q':'Qualy', 'r':'Carrera','ss':'Sprint Qualy', 's': 'Sprint'}
-    if('s' in proxima_Carrera.items[0]):
-        orden_horarios = ['p1', 'ss', 's', 'q', 'r']
-    for sesion in orden_horarios:
-        horario_sesion = datetime.fromisoformat(proxima_Carrera.items[0][sesion]['hora_empiezo'])
+    sesiones_carrera_quiniela.sort(key=lambda x: x.hora_empiezo)
+    for sesion_carrera in sesiones_carrera_quiniela:
+        horario_sesion = sesion_carrera.hora_empiezo
         horario_sesion = horario_sesion.astimezone(pytz.timezone('America/Mexico_City'))
         dia_semana = dias_semana[horario_sesion.weekday()]
         mes = meses[horario_sesion.month - 1] 
         hora = horario_sesion.strftime('%H:%M')
         dia_numero = horario_sesion.strftime('%d')
-        respuesta = respuesta + "\n" + "*" + texto_sesion[sesion] + ":* " + dia_semana + ", " + dia_numero + " de " + mes + " a las " +  hora + "hrs"
+        respuesta = respuesta + "\n" + "*" + texto_sesion[sesion_carrera.codigo] + ":* " + dia_semana + ", " + dia_numero + " de " + mes + " a las " +  hora + "hrs"
     await update.message.reply_markdown_v2(
         respuesta,
         reply_markup=ReplyKeyboardRemove()
