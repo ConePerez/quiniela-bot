@@ -469,7 +469,8 @@ async def revisarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     usuario = None
     with Session() as sesion:
         pago_revisar = sesion.query(Pago).filter(Pago.estado == 'guardado').first()
-        usuario = sesion.get(Usuario, pago_revisar.usuario_id)
+        if pago_revisar:
+            usuario = sesion.get(Usuario, pago_revisar.usuario_id)
     if not pago_revisar:
         pagos_procesados = str(context.user_data['procesados'])
         await update.message.reply_text(
@@ -499,7 +500,8 @@ async def confirmarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> in
     usuario = None
     with Session() as sesion:
         pago_confirmar = sesion.query(Pago).filter(Pago.estado == 'revision').first()
-        usuario = sesion.get(Usuario, pago_confirmar.usuario_id)
+        if pago_confirmar:
+            usuario = sesion.get(Usuario, pago_confirmar.usuario_id)
     if not pago_confirmar:
         pagos_procesados = str(context.user_data['procesados'])
         await update.message.reply_text(
