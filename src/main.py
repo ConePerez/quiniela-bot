@@ -438,19 +438,25 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return SUBIRCOMPROBANTE
 
 async def revisarpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    pagos_guardados = dbPagos.fetch({'estado':'guardado'})
-    pagos_en_revision = dbPagos.fetch({'estado':'revision'})
-    pagos_por_revisar = str(pagos_guardados.count)
-    pagos_por_confirmar = str(pagos_en_revision.count)
+    telegram_usuario = update.message.from_user
+    # pagos_guardados = dbPagos.fetch({'estado':'guardado'})
+    # pagos_en_revision = dbPagos.fetch({'estado':'revision'})
+    pagos_guardados = 0
+    pagos_en_revision = 0
+    with Session() as sesion:
+        pagos_guardados = len(sesion.query(Pago).filter(Pago.estado == 'guardado').all() )
+        pagos_en_revision = len(sesion.query(Pago).filter(Pago.estado == 'revision').all() )
+    # pagos_por_revisar = str(pagos_guardados.count)
+    # pagos_por_confirmar = str(pagos_en_revision.count)
     context.user_data['procesados'] = 0
-    if pagos_por_revisar == '0' and pagos_por_confirmar == '0':
+    if pagos_guardados == 0 and pagos_en_revision == 0:
         await update.message.reply_text(
         "No hay pagos por revisar o confirmar", 
         reply_markup=ReplyKeyboardRemove()
         )
         return ConversationHandler.END
     await update.message.reply_text(
-        'Hay ' + pagos_por_revisar + ' pagos por revisar y hay ' + pagos_por_confirmar + ' pagos por confirmar ¿Que quieres hacer?', 
+        'Hay ' + str(pagos_guardados) + ' pagos por revisar y hay ' + str(pagos_en_revision) + ' pagos por confirmar ¿Que quieres hacer?', 
         reply_markup=ReplyKeyboardMarkup(
             [['Revisar', 'Confirmar', 'Cancelar']], 
             one_time_keyboard=True, 
@@ -459,8 +465,12 @@ async def revisarpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int
     return PROCESARPAGO
 
 async def revisarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    pagos_guardados = dbPagos.fetch({'estado':'guardado'})
-    if pagos_guardados.count == 0:
+    pago_revisar = None
+    usuario = None
+    with Session() as sesion:
+        pago_revisar = sesion.query(Pago).filter(Pago.estado == 'guardado').first()
+        usuario = sesion.get(Usuario, pago_revisar.usuario_id)
+    if not pago_revisar:
         pagos_procesados = str(context.user_data['procesados'])
         await update.message.reply_text(
             'Revisaste ' + pagos_procesados + ' pagos, ya no quedan mas pagos por revisar.',
@@ -468,14 +478,14 @@ async def revisarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             )
         return ConversationHandler.END
     else:
-        pago_revisar = pagos_guardados.items[0]
-        numero_carreras = pago_revisar['carreras']
-        texto = pago_revisar['texto']
-        usuario = pago_revisar['nombre']
-        context.user_data["pago"] = pago_revisar['key']
+        # pago_revisar = pagos_guardados[0]
+        numero_carreras = pago_revisar.carreras
+        texto = pago_revisar.texto
+        # usuario = pago_revisar.nombre
+        context.user_data["pago"] = pago_revisar.id
         await update.message.reply_photo(
             pago_revisar['foto'], 
-            caption='Marcar como revisado este pago por ' + numero_carreras + ' carreras, enviado por ' + usuario + ' con el siguiente mensaje: "' + texto + '"',
+            caption='Marcar como revisado este pago por ' + str(numero_carreras) + ' carreras, enviado por ' + usuario.nombre + ' con el siguiente mensaje: "' + texto + '"',
             reply_markup=ReplyKeyboardMarkup(
                 [['Si', 'No']], 
                 one_time_keyboard=True, 
@@ -484,8 +494,13 @@ async def revisarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return PAGOREVISADO
 
 async def confirmarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    pagos_guardados = dbPagos.fetch({'estado':'revision'})
-    if pagos_guardados.count == 0:
+    # pagos_guardados = dbPagos.fetch({'estado':'revision'})
+    pago_confirmar = None
+    usuario = None
+    with Session() as sesion:
+        pago_confirmar = sesion.query(Pago).filter(Pago.estado == 'revision').first()
+        usuario = sesion.get(Usuario, pago_confirmar.usuario_id)
+    if not pago_confirmar:
         pagos_procesados = str(context.user_data['procesados'])
         await update.message.reply_text(
             'Validaste ' + pagos_procesados + ' pagos, ya no quedan mas pagos por validar.',
@@ -493,14 +508,14 @@ async def confirmarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> in
             )
         return ConversationHandler.END
     else:
-        pago_confirmar = pagos_guardados.items[0]
-        numero_carreras = pago_confirmar['carreras']
-        texto = pago_confirmar['texto']
-        usuario = pago_confirmar['nombre']
-        context.user_data["pago"] = pago_confirmar['key']
+        # pago_confirmar = pagos_guardados.items[0]
+        numero_carreras = pago_confirmar.carreras
+        texto = pago_confirmar.texto
+        # usuario = pago_confirmar['nombre']
+        context.user_data["pago"] = pago_confirmar.id
         await update.message.reply_photo(
             pago_confirmar['foto'], 
-            caption='Confirmas este pago por ' + numero_carreras + ' carreras, enviado por ' + usuario + ' con el siguiente mensaje: "' + texto + '"',
+            caption='Confirmas este pago por ' + str(numero_carreras) + ' carreras, enviado por ' + usuario.nombre + ' con el siguiente mensaje: "' + texto + '"',
             reply_markup=ReplyKeyboardMarkup(
                 [['Si', 'No']], 
                 one_time_keyboard=True, 
@@ -509,47 +524,62 @@ async def confirmarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> in
         return PAGOCONFIRMADO
 
 async def pagorevisado(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    dbPagos.update(updates={'estado':'revision'}, key=context.user_data['pago'])
-    context.user_data['procesados'] = context.user_data['procesados'] + 1
-    await update.message.reply_text(
-            'Pago revisado ¿quieres procesar otro pago?', 
-            reply_markup=ReplyKeyboardMarkup(
-                [['Si', 'No']], 
-                one_time_keyboard=True, 
+    # dbPagos.update(updates={'estado':'revision'}, key=context.user_data['pago'])
+    with Session() as sesion:
+        pago_revisado = sesion.get(Pago, context.user_data['pago'])
+        pago_revisado.estado = 'revision'
+        sesion.commit()
+        context.user_data['procesados'] = context.user_data['procesados'] + 1
+        await update.message.reply_text(
+                'Pago revisado ¿quieres procesar otro pago?', 
+                reply_markup=ReplyKeyboardMarkup(
+                    [['Si', 'No']], 
+                    one_time_keyboard=True, 
+                    )
                 )
-            )
     return SIGUIENTEPAGOREVISAR
 
 async def pagovalidado(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    dbPagos.update(updates={'estado':'confirmado'}, key=context.user_data['pago'])
-    context.user_data['procesados'] = context.user_data['procesados'] + 1
-    await update.message.reply_text(
-            'Pago validado ¿quieres procesar otro pago?', 
-            reply_markup=ReplyKeyboardMarkup(
-                [['Si', 'No']], 
-                one_time_keyboard=True, 
+    # dbPagos.update(updates={'estado':'confirmado'}, key=context.user_data['pago'])
+    with Session() as sesion:
+        pago_validado = sesion.get(Pago, context.user_data['pago'])
+        pago_validado.estado = 'confirmado'
+        sesion.commit()
+        context.user_data['procesados'] = context.user_data['procesados'] + 1
+        await update.message.reply_text(
+                'Pago validado ¿quieres procesar otro pago?', 
+                reply_markup=ReplyKeyboardMarkup(
+                    [['Si', 'No']], 
+                    one_time_keyboard=True, 
+                    )
                 )
-            )
     return SIGUIENTEPAGOCONFIRMAR
     
 async def pagorechazado(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    dbPagos.update(updates={'estado':'rechazado'}, key=context.user_data['pago'])
-    context.user_data['procesados'] = context.user_data['procesados'] + 1
-    await update.message.reply_text(
-            'Pago rechazado ¿quieres procesar otro pago?', 
-            reply_markup=ReplyKeyboardMarkup(
-                [['Si', 'No']], 
-                one_time_keyboard=True, 
+    # dbPagos.update(updates={'estado':'rechazado'}, key=context.user_data['pago'])
+    with Session() as sesion:
+        pago_rechazado = sesion.get(Pago, context.user_data['pago'])
+        context.user_data['procesados'] = context.user_data['procesados'] + 1
+        await update.message.reply_text(
+                'Pago rechazado ¿quieres procesar otro pago?', 
+                reply_markup=ReplyKeyboardMarkup(
+                    [['Si', 'No']], 
+                    one_time_keyboard=True, 
+                    )
                 )
-            )
     return SIGUIENTEPAGOCONFIRMAR
 
 async def finpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    pagos_pendientes_por_revisar = str(dbPagos.fetch({'estado':'guardado'}).count)
-    pagos_pendientes_por_validar = str(dbPagos.fetch({'estado':'revision'}).count)
+    # pagos_pendientes_por_revisar = str(dbPagos.fetch({'estado':'guardado'}).count)
+    # pagos_pendientes_por_validar = str(dbPagos.fetch({'estado':'revision'}).count)
+    pagos_pendientes_por_revisar = 0
+    pagos_pendientes_por_validar = 0
+    with Session() as sesion:
+        pagos_pendientes_por_revisar = len(sesion.query(Pago).filter(Pago.estado == 'guardado').all() )
+        pagos_pendientes_por_validar = len(sesion.query(Pago).filter(Pago.estado == 'revision').all() )
     pagos_procesados = str(context.user_data['procesados'])
     await update.message.reply_text(
-        'Revisaste o validaste ' + pagos_procesados + ' pagos, quedan pendientes ' + pagos_pendientes_por_revisar + ' por revisar y ' + pagos_pendientes_por_validar + ' por validar. Puedes volver a validar con /revisarpagos', 
+        'Revisaste o validaste ' + pagos_procesados + ' pagos, quedan pendientes ' + str(pagos_pendientes_por_revisar) + ' por revisar y ' + str(pagos_pendientes_por_validar) + ' por validar. Puedes volver a validar con /revisarpagos', 
         reply_markup=ReplyKeyboardRemove()
         )
     return ConversationHandler.END
