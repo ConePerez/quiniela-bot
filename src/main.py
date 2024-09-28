@@ -484,7 +484,7 @@ async def revisarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         # usuario = pago_revisar.nombre
         context.user_data["pago"] = pago_revisar.id
         await update.message.reply_photo(
-            pago_revisar['foto'], 
+            pago_revisar.foto, 
             caption='Marcar como revisado este pago por ' + str(numero_carreras) + ' carreras, enviado por ' + usuario.nombre + ' con el siguiente mensaje: "' + texto + '"',
             reply_markup=ReplyKeyboardMarkup(
                 [['Si', 'No']], 
@@ -514,7 +514,7 @@ async def confirmarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> in
         # usuario = pago_confirmar['nombre']
         context.user_data["pago"] = pago_confirmar.id
         await update.message.reply_photo(
-            pago_confirmar['foto'], 
+            pago_confirmar.foto, 
             caption='Confirmas este pago por ' + str(numero_carreras) + ' carreras, enviado por ' + usuario.nombre + ' con el siguiente mensaje: "' + texto + '"',
             reply_markup=ReplyKeyboardMarkup(
                 [['Si', 'No']], 
