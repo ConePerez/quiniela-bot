@@ -444,7 +444,7 @@ def pagos_usuario(usuario_pagos):
     pagos_guardados = 0
     pagos_confirmados = 0
     for pago in usuario_pagos:
-        if pago.estado == 'guardado':
+        if pago.estado == 'guardado' or pago.estado == 'revision':
             pagos_guardados += pago.carreras
         if pago.estado == 'confirmado':
             pagos_confirmados += pago.carreras
