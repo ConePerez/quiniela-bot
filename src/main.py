@@ -96,6 +96,8 @@ ptb = (
     .build()
 )
 
+fila_trabajos = ptb.job_queue
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await ptb.bot.setWebhook("https://parental-giulietta-conesoft-b7c0edc7.koyeb.app/") # replace <your-webhook-url>
@@ -172,7 +174,7 @@ async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     #     if pago['estado'] == 'confirmado':
     #         pagos_confirmados += int(pago['carreras'])
     # carreras = dbCarreras.fetch().count
-    texto_mensaje = f'Hasta el momento llevas {pagos_guardados} pagadas ({pagos_confirmados} estan confirmados), para entrar a la /proxima carrera debes tener al menos {carreras} pagadas.'
+    texto_mensaje = f'Hasta el momento llevas {pagos_guardados + pagos_confirmados} pagadas ({pagos_confirmados} estan confirmados), para entrar a la /proxima carrera debes tener al menos {carreras} pagadas.'
     await update.message.reply_text(
         texto_mensaje, 
         reply_markup=ReplyKeyboardRemove()
@@ -1035,3 +1037,22 @@ conv_teclado = ConversationHandler(
     # block=False,
 )
 ptb.add_handler(conv_teclado)
+
+async def enviar_pagos(context: ContextTypes.DEFAULT_TYPE):
+    pagos_por_enviar = None
+    with Session() as sesion:
+        pagos_por_enviar = sesion.query(Pago).filter(Pago.estado == 'confirmado', Pago.enviado == False).all()
+        if pagos_por_enviar:
+            for pago in pagos_por_enviar:
+                usuario = sesion.get(Usuario, pago.usuario_id)
+                texto = 'Este pago ya fue ' + pago.estado + ' por el tesorero. Puedes revisar cuantas carreras tienes pagadas con el comando de /misaldo'
+                await context.bot.send_message(
+                    usuario.telegram_id, 
+                    text=texto,
+                    reply_to_message_id=pago.mensaje
+                )                
+                pago.enviado = True
+                sesion.commit()
+    return
+
+job_minute = fila_trabajos.run_repeating(enviar_pagos, interval=60)
