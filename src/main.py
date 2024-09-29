@@ -1055,4 +1055,4 @@ async def enviar_pagos(context: ContextTypes.DEFAULT_TYPE):
                 sesion.commit()
     return
 
-job_minute = fila_trabajos.run_repeating(enviar_pagos, interval=60)
+job_minute = fila_trabajos.run_repeating(enviar_pagos, interval=600)
