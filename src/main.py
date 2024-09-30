@@ -1062,7 +1062,7 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
     urllivetiming = 'https://livetiming.formula1.com/static/'
     encurso_siguiente_Carrera = None
     with Session() as sesion:
-        encurso_siguiente_Carrera = sesion.query(Carrera).filter(or_(Carrera.estado == 'IDLE', Carrera.estado == 'EN-CURSO'))
+        encurso_siguiente_Carrera = sesion.query(Carrera).filter(or_(Carrera.estado == 'IDLE', Carrera.estado == 'EN-CURSO')).first()
         if not encurso_siguiente_Carrera:
             response = requests.get(url=urlevent_tracker, headers=headerapi)
             response.encoding = 'utf-8-sig'
@@ -1092,5 +1092,6 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                     sesion.commit()     
                 # mandar mensaje de proxima
     return
+
 fila_trabajos.run_repeating(enviar_pagos, interval=600)
 fila_trabajos.run_repeating(actualizar_tablas, interval=60)
