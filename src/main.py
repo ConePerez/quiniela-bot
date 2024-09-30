@@ -12,7 +12,7 @@ from collections import Counter
 from utilidades import *
 import numpy as np
 import matplotlib.pyplot as plt
-from models import Usuario, Quiniela, Resultado, Pago, Piloto, PuntosPilotosCarrrera, Carrera
+from models import Usuario, Quiniela, Resultado, Pago, Piloto, PuntosPilotosCarrrera, Carrera, SesionCarrera
 from base import engine, Base, Session
 from sqlalchemy import or_
 
@@ -1055,4 +1055,42 @@ async def enviar_pagos(context: ContextTypes.DEFAULT_TYPE):
                 sesion.commit()
     return
 
-job_minute = fila_trabajos.run_repeating(enviar_pagos, interval=600)
+async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
+    F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
+    urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
+    headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
+    urllivetiming = 'https://livetiming.formula1.com/static/'
+    encurso_siguiente_Carrera = None
+    with Session() as sesion:
+        encurso_siguiente_Carrera = sesion.query(Carrera).filter(or_(Carrera.estado == 'IDLE', Carrera.estado == 'EN-CURSO'))
+        if not encurso_siguiente_Carrera:
+            response = requests.get(url=urlevent_tracker, headers=headerapi)
+            response.encoding = 'utf-8-sig'
+            response_dict = response.json()
+            carrera_codigo_eventtracker = sesion.query(Carrera).filter(Carrera.codigo == response_dict['fomRaceId']).first()
+            rondas_archivadas = len(sesion.query(Carrera).filter(or_(Carrera.estado == "ARCHIVADA", Carrera.estado == 'CANCELADA')).all())
+            if not carrera_codigo_eventtracker:
+                es_valida = True
+                carrera_codigo = response_dict['fomRaceId']
+                carrera_nombre = response_dict['race']['meetingOfficialName']
+                carrera_estado = response_dict['seasonContext']['state']
+                carrera_empiezo = response_dict['race']['meetingStartDate']
+                carrera_empiezo = carrera_empiezo.replace('Z', '+00:00')
+                carrera_termino = response_dict['race']['meetingEndDate']
+                carrera_termino = carrera_termino.replace('Z','+00:00')
+                nueva_carrera = Carrera(codigo=carrera_codigo, nombre=carrera_nombre, hora_empiezo=carrera_empiezo, hora_termino=carrera_termino, estado=carrera_estado, url='')
+                sesion.add(nueva_carrera)
+                sesion.flush()
+                for session in range(len(response_dict['seasonContext']['timetables'])):
+                    session_row = response_dict['seasonContext']['timetables'][session]
+                    if session_row['startTime'] == 'TBC':
+                        es_valida = False
+                    nueva_sesion = SesionCarrera(codigo=session_row['session'], carrera_id=nueva_carrera.id, estado=session_row['state'], 
+                                                 hora_empiezo=session_row['startTime']+session_row['gmtOffset'], hora_termino=session_row['endTime'+session_row['gmtOffset']])
+                    sesion.flush(nueva_sesion)
+                if es_valida:
+                    sesion.commit()     
+                # mandar mensaje de proxima
+    return
+fila_trabajos.run_repeating(enviar_pagos, interval=600)
+fila_trabajos.run_repeating(actualizar_tablas, interval=60)

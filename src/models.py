@@ -89,6 +89,15 @@ class Carrera(Base):
     sesionescarrera = relationship("SesionCarrera", backref=backref("carreras"))
     resultados = relationship("Resultado", backref=backref("carreras"))
 
+    def __init__(self, codigo, nombre, hora_empiezo, hora_termino, estado, ronda, url):
+        self.codigo = codigo
+        self.nombre = nombre
+        self.hora_empiezo = hora_empiezo
+        self.hora_empiezo = hora_termino
+        self.estado = estado
+        self.ronda = ronda
+        self.url = url
+
 class SesionCarrera(Base):
     __tablename__ = 'sesioncarreras'
 
@@ -99,6 +108,12 @@ class SesionCarrera(Base):
     hora_empiezo = Column(TIMESTAMP(timezone=True))
     hora_termino = Column(TIMESTAMP(timezone=True))
 
+    def __init__(self, codigo, carrera_id, estado, hora_empiezo, hora_termino):
+        self.codigo = codigo
+        self.carrera_id = carrera_id
+        self.estado = estado
+        self.hora_empiezo = hora_empiezo
+        self.hora_termino = hora_termino
 
 class Resultado(Base):
     __tablename__ = 'resultados'
