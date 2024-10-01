@@ -1078,11 +1078,11 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                 carrera_empiezo = carrera_empiezo.replace('Z', '+00:00')
                 carrera_termino = response_dict['race']['meetingEndDate']
                 carrera_termino = carrera_termino.replace('Z','+00:00')
-                logger.info("respuesta", response_dict)
+                logger.info("respuesta", str(response_dict))
                 nueva_carrera = Carrera(codigo=carrera_codigo, nombre=carrera_nombre, hora_empiezo=carrera_empiezo, hora_termino=carrera_termino, estado=carrera_estado, url='', ronda=rondas_archivadas+1)
                 sesion.add(nueva_carrera)
                 sesion.flush()
-                logger.info("nueva", nueva_carrera)
+                logger.info("nueva", str(nueva_carrera.id))
                 for session in range(len(response_dict['seasonContext']['timetables'])):
                     session_row = response_dict['seasonContext']['timetables'][session]
                     if session_row['startTime'] == 'TBC':
