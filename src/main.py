@@ -1080,7 +1080,7 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                 carrera_termino = carrera_termino.replace('Z','+00:00')
                 nueva_carrera = Carrera(codigo=carrera_codigo, nombre=carrera_nombre, hora_empiezo=carrera_empiezo, hora_termino=carrera_termino, estado=carrera_estado, url='', ronda=rondas_archivadas+1)
                 sesion.add(nueva_carrera)
-                # sesion.flush()
+                sesion.flush()
                 logger.info(str(nueva_carrera.id))
                 nuevas_sesiones = []
                 for session in range(len(response_dict['seasonContext']['timetables'])):
