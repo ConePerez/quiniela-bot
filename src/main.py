@@ -1080,17 +1080,18 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                 carrera_termino = carrera_termino.replace('Z','+00:00')
                 nueva_carrera = Carrera(codigo=carrera_codigo, nombre=carrera_nombre, hora_empiezo=carrera_empiezo, hora_termino=carrera_termino, estado=carrera_estado, url='', ronda=rondas_archivadas+1)
                 sesion.add(nueva_carrera)
-                sesion.flush()
+                # sesion.flush()
                 logger.info(str(nueva_carrera.id))
+                nuevas_sesiones = []
                 for session in range(len(response_dict['seasonContext']['timetables'])):
                     session_row = response_dict['seasonContext']['timetables'][session]
                     if session_row['startTime'] == 'TBC':
                         es_valida = False
-                    nueva_sesion = SesionCarrera(codigo=session_row['session'], carrera_id=nueva_carrera.id, estado=session_row['state'], 
-                                                 hora_empiezo=session_row['startTime']+session_row['gmtOffset'], hora_termino=session_row['endTime']+session_row['gmtOffset'])
-                    sesion.flush(nueva_sesion)
+                    nuevas_sesiones.append( SesionCarrera(codigo=session_row['session'], carrera_id=nueva_carrera.id, estado=session_row['state'], 
+                                                 hora_empiezo=session_row['startTime']+session_row['gmtOffset'], hora_termino=session_row['endTime']+session_row['gmtOffset']))
                 if es_valida:
-                    sesion.commit()     
+                    sesion.add_all(nuevas_sesiones)
+                    sesion.commit()
                 # mandar mensaje de proxima
     return
 
