@@ -1086,7 +1086,7 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                     if session_row['startTime'] == 'TBC':
                         es_valida = False
                     nueva_sesion = SesionCarrera(codigo=session_row['session'], carrera_id=nueva_carrera.id, estado=session_row['state'], 
-                                                 hora_empiezo=session_row['startTime']+session_row['gmtOffset'], hora_termino=session_row['endTime'+session_row['gmtOffset']])
+                                                 hora_empiezo=session_row['startTime']+session_row['gmtOffset'], hora_termino=session_row['endTime']+session_row['gmtOffset'])
                     sesion.flush(nueva_sesion)
                 if es_valida:
                     sesion.commit()     
