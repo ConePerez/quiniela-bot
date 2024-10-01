@@ -93,7 +93,7 @@ class Carrera(Base):
         self.codigo = codigo
         self.nombre = nombre
         self.hora_empiezo = hora_empiezo
-        self.hora_empiezo = hora_termino
+        self.hora_termino = hora_termino
         self.estado = estado
         self.ronda = ronda
         self.url = url
