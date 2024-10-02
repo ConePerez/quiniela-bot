@@ -1,6 +1,5 @@
 # models.py
 import enum
-from base import Base
 from sqlalchemy import Column, String, Enum, ForeignKey, Float, BigInteger, Integer, TIMESTAMP, Double, Boolean
 from sqlalchemy.orm import relationship, backref, DeclarativeBase
 
