@@ -200,7 +200,7 @@ def crear_tabla_quinielas(sesion, carrera_en_curso, enmascarada=False):
         dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
     # await dbQuiniela.close()
     
-    return im, carrera_nombre, fig
+    return im, fig
 
 def plotBarHorizontal(results, category_names):
     labels = list(results.keys())
