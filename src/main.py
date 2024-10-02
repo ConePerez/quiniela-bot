@@ -1101,7 +1101,13 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                     encurso_siguiente_Carrera.estado = "EN-CURSO"
                     sesion.commit()
             else:
-                if hora_actual >= encurso_siguiente_Carrera.hora_empiezo and encurso_siguiente_Carrera.estado == 'upcoming':
+                hora_qualy = None
+                estado_qualy = None
+                for sesion_carrera in encurso_siguiente_Carrera.sesioncarreras:
+                    if sesion_carrera.codigo == 'q':
+                        hora_qualy = sesion_carrera.hora_empiezo
+                        estado_qualy = sesion_carrera.estado
+                if hora_actual >= hora_qualy and estado_qualy == 'upcoming':
                     await archivar_quinielas_participante(sesion, encurso_siguiente_Carrera)
                     im, carrera_nombre, graficaPilotos = await crear_tabla_quinielas(sesion, encurso_siguiente_Carrera, False)
                     texto = "Quinielas para la carrera" + encurso_siguiente_Carrera.nombre
