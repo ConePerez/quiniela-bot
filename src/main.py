@@ -1095,36 +1095,36 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                 if es_valida:
                     sesion.add_all(nuevas_sesiones)
                     sesion.commit()
-            else:
-                if encurso_siguiente_Carrera.estado == 'IDLE':
-                    if hora_actual > encurso_siguiente_Carrera.hora_empiezo:
-                        encurso_siguiente_Carrera.estado = "EN-CURSO"
-                        sesion.commit()
-                else:
-                    if hora_actual >= encurso_siguiente_Carrera.hora_empiezo and encurso_siguiente_Carrera.estado == 'upcoming':
-                        await archivar_quinielas_participante(sesion, encurso_siguiente_Carrera)
-                        im, carrera_nombre, graficaPilotos = await crear_tabla_quinielas(sesion, encurso_siguiente_Carrera, False)
-                        texto = "Quinielas para la carrera" + encurso_siguiente_Carrera.nombre
-                        with BytesIO() as tablaquinielaimagen:
-                            im.save(tablaquinielaimagen, "png")
-                            tablaquinielaimagen.seek(0)
-                            await context.bot.send_photo(
-                                chat_id= TELEGRAM_GROUP,
-                                photo=tablaquinielaimagen,
-                                caption =texto,
-                            )
-                        texto = 'Grafica de los pilotos para la carrera de ' + encurso_siguiente_Carrera.nombre
-                        with BytesIO() as graficaPilotos_imagen:
-                            graficaPilotos.savefig(graficaPilotos_imagen)
-                            graficaPilotos_imagen.seek(0)
-                            await context.bot.send_photo(
-                                chat_id=TELEGRAM_GROUP,
-                                photo=graficaPilotos_imagen,
-                                caption=texto
-                            )
-                    sesion_qualy = sesion.query(SesionCarrera).filter(SesionCarrera.carrera_id == encurso_siguiente_Carrera.id, SesionCarrera.codigo == 'q')
-                    sesion_qualy.estado = 'EMPEZADA'
+        else:
+            if encurso_siguiente_Carrera.estado == 'IDLE':
+                if hora_actual > encurso_siguiente_Carrera.hora_empiezo:
+                    encurso_siguiente_Carrera.estado = "EN-CURSO"
                     sesion.commit()
+            else:
+                if hora_actual >= encurso_siguiente_Carrera.hora_empiezo and encurso_siguiente_Carrera.estado == 'upcoming':
+                    await archivar_quinielas_participante(sesion, encurso_siguiente_Carrera)
+                    im, carrera_nombre, graficaPilotos = await crear_tabla_quinielas(sesion, encurso_siguiente_Carrera, False)
+                    texto = "Quinielas para la carrera" + encurso_siguiente_Carrera.nombre
+                    with BytesIO() as tablaquinielaimagen:
+                        im.save(tablaquinielaimagen, "png")
+                        tablaquinielaimagen.seek(0)
+                        await context.bot.send_photo(
+                            chat_id= TELEGRAM_GROUP,
+                            photo=tablaquinielaimagen,
+                            caption =texto,
+                        )
+                    texto = 'Grafica de los pilotos para la carrera de ' + encurso_siguiente_Carrera.nombre
+                    with BytesIO() as graficaPilotos_imagen:
+                        graficaPilotos.savefig(graficaPilotos_imagen)
+                        graficaPilotos_imagen.seek(0)
+                        await context.bot.send_photo(
+                            chat_id=TELEGRAM_GROUP,
+                            photo=graficaPilotos_imagen,
+                            caption=texto
+                        )
+                sesion_qualy = sesion.query(SesionCarrera).filter(SesionCarrera.carrera_id == encurso_siguiente_Carrera.id, SesionCarrera.codigo == 'q')
+                sesion_qualy.estado = 'EMPEZADA'
+                sesion.commit()
 
                 # mandar mensaje de proxima
     return
