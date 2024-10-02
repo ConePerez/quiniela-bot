@@ -7,6 +7,8 @@ import pytz
 from operator import itemgetter
 import numpy as np
 import matplotlib.pyplot as plt
+from base import Session
+from models import Usuario, Quiniela, Resultado, Pago, Piloto, PuntosPilotosCarrrera, Carrera, SesionCarrera, Base, HistoricoQuiniela
 
 
 def poner_fondo_gris(dibujo: ImageDraw.ImageDraw, total_filas: int, largo_fila: int) -> ImageDraw.ImageDraw:
@@ -47,33 +49,14 @@ async def obtener_resultados(url, carrera):
     # await dbCarreras.close()
     return posiciones_dict, pilotos_con_puntos
 
-async def archivar_quinielas_participante(carrera):
-    dbHistorico = deta.AsyncBase('Historico')
-    dbQuiniela = deta.AsyncBase("Quiniela")
-    datosquiniela = await dbQuiniela.fetch()
-    await dbQuiniela.close()
-    quinielas = datosquiniela.items
-    for i_quiniela in range(len(quinielas)):
-        quiniela = quinielas[i_quiniela]
-        historico = await dbHistorico.get(quiniela['key'])
-        if historico is None:
-            await dbHistorico.put({
-                'key': quiniela['key'],
-                'Nombre': quiniela['Nombre'],
-                'Quinielas': {},
-                'Resultados': {}, 
-            })
-            historico = await dbHistorico.get(quiniela['key'])
-        historico_quinielas = historico['Quinielas']
-        historico_quinielas[carrera] = quiniela
-        historico_resultados = historico['Resultados']
-        historico_resultados[carrera] = {}
-        await dbHistorico.update(updates={ 
-            'Quinielas': historico_quinielas, 
-            'Resultados': historico_resultados, 
-            }, key=quiniela['key'])
-    await dbHistorico.close()
-    await dbQuiniela.close()
+async def archivar_quinielas_participante(sesion, carrera):
+    historicos = []
+    quinielas = sesion.query(Quiniela).all()
+    for quiniela in quinielas:
+        historicos.append(HistoricoQuiniela(usuario_id=quiniela.usuario_id, carrera_id=carrera.id , quiniela_carrera_id=quiniela.carrera_id, quiniela_fechahora=quiniela.fecha_hora, 
+                                            quiniela_lista=quiniela.lista))
+    sesion.add_all(historicos)
+    sesion.commit()
 
 async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
     dbCarreras = deta.AsyncBase('Carreras')
@@ -159,28 +142,28 @@ async def crear_tabla_puntos(obj_carrera):
     dibujo.text((20, tablapilotostamano[3] + 20), "Resultados tomados de la pagina oficial de Formula 1", font=letraabajo, fill="black")
     return im, obj_carrera['Nombre']
 
-async def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
+async def crear_tabla_quinielas(sesion, carrera_en_curso, enmascarada=False):
     """Crear la tabla de las quinielas en una imagen."""
-    carrera_nombre = carrera_en_curso['Nombre']
-    carrera_clave = carrera_en_curso['key']
+    # carrera_nombre = carrera_en_curso['Nombre']
+    # carrera_clave = carrera_en_curso['key']
     
     tablaquiniela = PrettyTable()
-    tablaquiniela.title = carrera_nombre
+    tablaquiniela.title = carrera_en_curso.nombre
     tablaquiniela.field_names = ["Fecha/hora", "Nombre", "P1", "P2", "P3", "P4", "P5", "P6", "P7",]
     tablaquiniela.sortby = "Fecha/hora"
-    dbQuiniela = deta.AsyncBase('Quiniela')
-    datosquiniela = await dbQuiniela.fetch({'Carrera':carrera_clave})
-    filas = datosquiniela.items    
+    # dbQuiniela = deta.AsyncBase('Quiniela')
+    # datosquiniela = await dbQuiniela.fetch({'Carrera':carrera_clave})
+    # filas = datosquiniela.items    
+    quinielas = carrera_en_curso.quinielas
     im = Image.new("RGB", (200, 200), "white")
     fig = 'No hay carreras archivadas.'
-    if datosquiniela.count > 0:
+    if len(quinielas) > 0:
         fig = 'Si hay quinielas'
         pilotos_posiciones_conteo = {'P1': [], 'P2': [], 'P3': [], 'P4': [], 'P5': [], 'P6': [], 'P7': []}
         pilotos_en_quiniela = []
         indice_piloto = 0
-        for index in range(datosquiniela.count):
-            fila = filas[index]
-            listaquiniela = fila["Lista"].split(",")
+        for quiniela in quinielas:
+            listaquiniela = quiniela.lista
             for pos, piloto in enumerate(listaquiniela):
                 if piloto in pilotos_en_quiniela:
                     indice_piloto = pilotos_en_quiniela.index(piloto)
@@ -195,9 +178,9 @@ async def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
                     pilotos_posiciones_conteo['P' + str(pos +1)][indice_piloto] = 1
             if(enmascarada):
                 listaquiniela = ["XXX"] * len(listaquiniela)
-            fechahoraoriginal = datetime.fromisoformat(fila["FechaHora"])
+            fechahoraoriginal = quiniela.fecha_hora
             fechahoragdl = fechahoraoriginal.astimezone(pytz.timezone('America/Mexico_City'))
-            tablaquiniela.add_row([fechahoragdl.strftime('%Y-%m-%d %H:%M:%S'), fila["Nombre"], listaquiniela[0], listaquiniela[1], listaquiniela[2], listaquiniela[3], listaquiniela[4], listaquiniela[5], listaquiniela[6]])
+            tablaquiniela.add_row([fechahoragdl.strftime('%Y-%m-%d %H:%M:%S'), quiniela.usuario.obtener_nombre_completo(), listaquiniela[0], listaquiniela[1], listaquiniela[2], listaquiniela[3], listaquiniela[4], listaquiniela[5], listaquiniela[6]])
         indice_piloto = 0
         for pos, conteo in pilotos_posiciones_conteo.items():
             if len(conteo) != len(pilotos_en_quiniela):
@@ -211,11 +194,11 @@ async def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
         tablaquinielatamano = dibujo.multiline_textbbox([0,0],str(tablaquiniela),font=letra)
         im = im.resize((tablaquinielatamano[2] + 20, tablaquinielatamano[3] + 40))
         dibujo = ImageDraw.Draw(im)
-        dibujo = poner_fondo_gris(dibujo, datosquiniela.count, tablaquinielatamano[2])
+        dibujo = poner_fondo_gris(dibujo, len(quinielas), tablaquinielatamano[2])
         dibujo.text((10, 10), str(tablaquiniela), font=letra, fill="black")
         letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
-    await dbQuiniela.close()
+    # await dbQuiniela.close()
     
     return im, carrera_nombre, fig
 

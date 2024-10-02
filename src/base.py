@@ -18,4 +18,4 @@ connection_string = URL.create(
 
 engine = create_engine(connection_string)
 Session = sessionmaker(bind=engine, expire_on_commit=False)
-Base = declarative_base()
+# Base = declarative_base()
