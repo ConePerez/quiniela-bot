@@ -49,7 +49,7 @@ async def obtener_resultados(url, carrera):
     # await dbCarreras.close()
     return posiciones_dict, pilotos_con_puntos
 
-async def archivar_quinielas_participante(sesion, carrera):
+def archivar_quinielas_participante(sesion, carrera):
     historicos = []
     quinielas = sesion.query(Quiniela).all()
     for quiniela in quinielas:
@@ -142,7 +142,7 @@ async def crear_tabla_puntos(obj_carrera):
     dibujo.text((20, tablapilotostamano[3] + 20), "Resultados tomados de la pagina oficial de Formula 1", font=letraabajo, fill="black")
     return im, obj_carrera['Nombre']
 
-async def crear_tabla_quinielas(sesion, carrera_en_curso, enmascarada=False):
+def crear_tabla_quinielas(sesion, carrera_en_curso, enmascarada=False):
     """Crear la tabla de las quinielas en una imagen."""
     # carrera_nombre = carrera_en_curso['Nombre']
     # carrera_clave = carrera_en_curso['key']

@@ -1108,8 +1108,8 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                         hora_qualy = sesion_carrera.hora_empiezo
                         estado_qualy = sesion_carrera.estado
                 if hora_actual >= hora_qualy and estado_qualy == 'upcoming':
-                    await archivar_quinielas_participante(sesion, encurso_siguiente_Carrera)
-                    im, carrera_nombre, graficaPilotos = await crear_tabla_quinielas(sesion, encurso_siguiente_Carrera, False)
+                    # archivar_quinielas_participante(sesion, encurso_siguiente_Carrera)
+                    im, carrera_nombre, graficaPilotos = crear_tabla_quinielas(sesion, encurso_siguiente_Carrera, False)
                     texto = "Quinielas para la carrera" + encurso_siguiente_Carrera.nombre
                     with BytesIO() as tablaquinielaimagen:
                         im.save(tablaquinielaimagen, "png")
