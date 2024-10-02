@@ -1101,14 +1101,12 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                     encurso_siguiente_Carrera.estado = "EN-CURSO"
                     sesion.commit()
             else:
-                hora_qualy = None
-                estado_qualy = None
+                sesion_qualy = None
                 for sesion_carrera in encurso_siguiente_Carrera.sesioncarreras:
                     if sesion_carrera.codigo == 'q':
-                        hora_qualy = sesion_carrera.hora_empiezo
-                        estado_qualy = sesion_carrera.estado
-                if hora_actual >= hora_qualy and estado_qualy == 'upcoming':
-                    # archivar_quinielas_participante(sesion, encurso_siguiente_Carrera)
+                        sesion_qualy = sesion_carrera
+                if hora_actual >= sesion_qualy.hora_empiezo and sesion_qualy.estado == 'upcoming':
+                    archivar_quinielas_participante(sesion, encurso_siguiente_Carrera)
                     im, graficaPilotos = crear_tabla_quinielas(sesion, encurso_siguiente_Carrera, False)
                     texto = "Quinielas para la carrera" + encurso_siguiente_Carrera.nombre
                     with BytesIO() as tablaquinielaimagen:
@@ -1128,9 +1126,8 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                             photo=graficaPilotos_imagen,
                             caption=texto
                         )
-                sesion_qualy = sesion.query(SesionCarrera).filter(SesionCarrera.carrera_id == encurso_siguiente_Carrera.id, SesionCarrera.codigo == 'q')
-                sesion_qualy.estado = 'EMPEZADA'
-                sesion.commit()
+                    sesion_qualy.estado = 'EMPEZADA'
+                    sesion.commit()
 
                 # mandar mensaje de proxima
     return
