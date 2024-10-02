@@ -406,7 +406,7 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         usuario_pagos = usuario.pagos
         pagos_guardados, pagos_confirmados = pagos_usuario(usuario_pagos)
         # controles = dbConfiguracion.get('controles')
-        resto = 24 - pagos_guardados + pagos_confirmados
+        resto = 24 - (pagos_guardados + pagos_confirmados)
         if resto == 0:
             await update.message.reply_text(
                 'Ya cubriste todas las carresas. Puedes meter tu /quiniela sin problema.',
