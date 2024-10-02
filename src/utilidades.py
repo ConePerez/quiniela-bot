@@ -163,7 +163,7 @@ def crear_tabla_quinielas(sesion, carrera_en_curso, enmascarada=False):
         pilotos_en_quiniela = []
         indice_piloto = 0
         for quiniela in quinielas:
-            listaquiniela = quiniela.lista
+            listaquiniela = quiniela.lista.split(",")
             for pos, piloto in enumerate(listaquiniela):
                 if piloto in pilotos_en_quiniela:
                     indice_piloto = pilotos_en_quiniela.index(piloto)
