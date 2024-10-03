@@ -85,6 +85,14 @@ class PuntosPilotosCarrrera(Base):
     carrera = relationship("Carrera", back_populates="puntospilotoscarreras")
     piloto = relationship("Piloto", back_populates="puntospilotoscarreras")
 
+    def __init__(self, carrera_id, piloto_id, posicion, puntos, intervalo):
+        self.carrera_id = carrera_id
+        self.piloto_id = piloto_id
+        self.posicion = posicion
+        self.puntos = puntos
+        self.intervalo = intervalo
+        
+
 class HistoricoQuiniela(Base):
     __tablename__ = 'historicoquinielas'
 

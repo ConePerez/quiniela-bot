@@ -19,7 +19,7 @@ def poner_fondo_gris(dibujo: ImageDraw.ImageDraw, total_filas: int, largo_fila: 
         y = y + 3.5 + 15 + 3.5 + 14
     return dibujo
 
-async def obtener_resultados(url, carrera):
+def obtener_resultados(sesion, url, carrera):
     # dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
     # dbCarreras = deta.AsyncBase('Carreras')
     soup = BeautifulSoup(requests.get(url).text)
@@ -32,6 +32,7 @@ async def obtener_resultados(url, carrera):
             rows.append([el.text.strip() for el in row.find_all('td')])
     posiciones_dict = {}
     pilotos_con_puntos = 0
+    pilotos_top10 = []
     for row in rows:
         if(row[0].isnumeric()):
             posicion = int(row[0])
@@ -41,8 +42,13 @@ async def obtener_resultados(url, carrera):
                     'intervalo': row[5],
                     'puntos': int(row[6])
                     }
+                piloto = sesion.query(Piloto).filter(Piloto.numero == int(row[1])).first()
+                pilotos_top10.append(PuntosPilotosCarrrera(carrera_id=carrera.id, piloto_id=piloto.id, posicion=posicion, puntos=int(row[6]), intervalo=row[5]))
                 if int(row[6]) > 0:
                     pilotos_con_puntos = pilotos_con_puntos + 1
+    if pilotos_con_puntos >= 10:
+        sesion.add_all(pilotos_top10)
+        sesion.flush()
     # await dbPuntosPilotos.put({'key': carrera, 'Pilotos':posiciones_dict})
     # await dbCarreras.update(updates={'url':url}, key=carrera)
     # await dbPuntosPilotos.close()
@@ -58,7 +64,7 @@ def archivar_quinielas_participante(sesion, carrera):
     sesion.add_all(historicos)
     sesion.commit()
 
-async def archivar_puntos_participante(carrera_codigo, posiciones_dict):
+def archivar_puntos_participante(sesion, carrera:Carrera, posiciones_dict):
     dbCarreras = deta.AsyncBase('Carreras')
     dbHistorico = deta.AsyncBase('Historico')
     dbPilotos = deta.AsyncBase("Pilotos")

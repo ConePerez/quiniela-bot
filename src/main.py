@@ -658,7 +658,7 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         pilotos = Piloto.obtener_pilotos(sesion)
         carrera_quiniela =  sesion.query(Carrera).filter(or_(Carrera.estado == 'IDLE', Carrera.estado == 'EN-CURSO')).first()
         if carrera_quiniela:
-            sesiones_carrera_quiniela = carrera_quiniela.sesionescarrera    
+            sesiones_carrera_quiniela = carrera_quiniela.sesioncarreras    
     # puntospilotos = dbPuntosPilotos.fetch()
     # pilotoslista = dbPilotos.get('2024')['Lista']
     # carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
@@ -1128,8 +1128,50 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                         )
                     sesion_qualy.estado = 'EMPEZADA'
                     sesion.commit()
-
-                # mandar mensaje de proxima
+                if hora_actual > encurso_siguiente_Carrera.hora_termino:
+                    response = requests.get(url=urlevent_tracker, headers=headerapi)
+                    response.encoding = 'utf-8-sig'
+                    response_dict = response.json()
+                    links = []
+                    if('links' in response_dict):
+                        links = response_dict['links']                                
+                        url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
+                        if(not(url_results_index is None)):
+                            url_results = links[url_results_index]['url']                        
+                            posiciones_dict, pilotos_con_puntos = obtener_resultados(sesion, url_results, encurso_siguiente_Carrera)
+                            if pilotos_con_puntos >= 10:
+                                archivar_puntos_participante(sesion, encurso_siguiente_Carrera, posiciones_dict)
+                                im, texto = crear_tabla_resultados()
+                                with BytesIO() as tablaresutados_imagen:    
+                                    im.save(tablaresutados_imagen, "png")
+                                    tablaresutados_imagen.seek(0)
+                                    await context.bot.send_photo(
+                                        chat_id= TELEGRAM_GROUP,
+                                        photo=tablaresutados_imagen, 
+                                        caption=texto
+                                        )
+                                im, carrera = crear_tabla_puntos(encurso_siguiente_Carrera)
+                                texto = 'Resultados de la carrera: ' + carrera
+                                with BytesIO() as tabla_puntos_imagen:    
+                                    im.save(tabla_puntos_imagen, "png")
+                                    tabla_puntos_imagen.seek(0)
+                                    await context.bot.send_photo(
+                                        chat_id= TELEGRAM_GROUP,
+                                        photo=tabla_puntos_imagen, 
+                                        caption=texto
+                                        )
+                                im, total_rondas = crear_tabla_general()
+                                texto = "Total de rondas incluidas: " + str(total_rondas)
+                                with BytesIO() as tablageneral_imagen:    
+                                    im.save(tablageneral_imagen, "png")
+                                    tablageneral_imagen.seek(0)
+                                    await context.bot.send_photo(
+                                        chat_id= TELEGRAM_GROUP,
+                                        photo=tablageneral_imagen, 
+                                        caption=texto
+                                        )
+                                encurso_siguiente_Carrera.estado = 'ARCHIVADA'
+                                sesion.commit()
     return
 
 fila_trabajos.run_repeating(enviar_pagos, interval=600)
