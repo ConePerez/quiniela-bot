@@ -71,7 +71,7 @@ class Piloto(Base):
 
     @staticmethod
     def obtener_pilotos(session):
-        return session.select(Piloto).all()
+        return session.query(Piloto).all()
 
 class PuntosPilotosCarrrera(Base):
     __tablename__ = 'puntospilotoscarrera'

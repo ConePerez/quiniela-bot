@@ -276,7 +276,7 @@ async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     with Session() as sesion:
         proxima_carrera = sesion.query(Carrera).filter(or_(Carrera.estado == "IDLE", Carrera.estado == "EN-CURSO")).first()
         if proxima_carrera:
-            sesiones_carrera_quiniela = proxima_carrera.sesionescarrera
+            sesiones_carrera_quiniela = proxima_carrera.sesioncarreras
     if not proxima_carrera:
         await update.message.reply_text(
             'Todavia no se actualiza mi base de datos con la proxima carrera. Por lo general se actualiza un dia despues de que termino la ultima carrera.'
