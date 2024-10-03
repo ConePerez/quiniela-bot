@@ -1107,7 +1107,7 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                         sesion_qualy = sesion_carrera
                 if hora_actual >= sesion_qualy.hora_empiezo and sesion_qualy.estado == 'upcoming':
                     archivar_quinielas_participante(sesion, encurso_siguiente_Carrera)
-                    im, graficaPilotos = crear_tabla_quinielas(sesion, encurso_siguiente_Carrera, False)
+                    im, graficaPilotos = crear_tabla_quinielas(encurso_siguiente_Carrera, False)
                     texto = "Quinielas para la carrera" + encurso_siguiente_Carrera.nombre
                     with BytesIO() as tablaquinielaimagen:
                         im.save(tablaquinielaimagen, "png")
@@ -1141,7 +1141,7 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                             posiciones_dict, pilotos_con_puntos = obtener_resultados(sesion, url_results, encurso_siguiente_Carrera)
                             if pilotos_con_puntos >= 10:
                                 archivar_puntos_participante(sesion, encurso_siguiente_Carrera, posiciones_dict)
-                                im, texto = crear_tabla_resultados()
+                                im, texto = crear_tabla_resultados(sesion, encurso_siguiente_Carrera)
                                 with BytesIO() as tablaresutados_imagen:    
                                     im.save(tablaresutados_imagen, "png")
                                     tablaresutados_imagen.seek(0)
@@ -1150,8 +1150,8 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                                         photo=tablaresutados_imagen, 
                                         caption=texto
                                         )
-                                im, carrera = crear_tabla_puntos(encurso_siguiente_Carrera)
-                                texto = 'Resultados de la carrera: ' + carrera
+                                im = crear_tabla_puntos(sesion, encurso_siguiente_Carrera)
+                                texto = 'Resultados de la carrera: ' + encurso_siguiente_Carrera.nombre
                                 with BytesIO() as tabla_puntos_imagen:    
                                     im.save(tabla_puntos_imagen, "png")
                                     tabla_puntos_imagen.seek(0)
@@ -1171,8 +1171,9 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                                         caption=texto
                                         )
                                 encurso_siguiente_Carrera.estado = 'ARCHIVADA'
-                                sesion.commit()
+                                sesion.flush()
+                            sesion.commit()
     return
 
 fila_trabajos.run_repeating(enviar_pagos, interval=600)
-fila_trabajos.run_repeating(actualizar_tablas, interval=60)
+fila_trabajos.run_repeating(actualizar_tablas, interval=600)

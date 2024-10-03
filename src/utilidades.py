@@ -20,8 +20,6 @@ def poner_fondo_gris(dibujo: ImageDraw.ImageDraw, total_filas: int, largo_fila: 
     return dibujo
 
 def obtener_resultados(sesion, url, carrera):
-    # dbPuntosPilotos = deta.AsyncBase('PuntosPilotos')
-    # dbCarreras = deta.AsyncBase('Carreras')
     soup = BeautifulSoup(requests.get(url).text)
     table = soup.find('table')
     rows = []
@@ -49,10 +47,6 @@ def obtener_resultados(sesion, url, carrera):
     if pilotos_con_puntos >= 10:
         sesion.add_all(pilotos_top10)
         sesion.flush()
-    # await dbPuntosPilotos.put({'key': carrera, 'Pilotos':posiciones_dict})
-    # await dbCarreras.update(updates={'url':url}, key=carrera)
-    # await dbPuntosPilotos.close()
-    # await dbCarreras.close()
     return posiciones_dict, pilotos_con_puntos
 
 def archivar_quinielas_participante(sesion, carrera):
@@ -65,77 +59,37 @@ def archivar_quinielas_participante(sesion, carrera):
     sesion.commit()
 
 def archivar_puntos_participante(sesion, carrera:Carrera, posiciones_dict):
-    dbCarreras = deta.AsyncBase('Carreras')
-    dbHistorico = deta.AsyncBase('Historico')
-    dbPilotos = deta.AsyncBase("Pilotos")
-    dbPagos = deta.AsyncBase('Pagos')
-    dbConfiguracion= deta.AsyncBase('Configuracion')
-    controles = await dbConfiguracion.get('controles')
-    await dbConfiguracion.close()
-    carrera = await dbCarreras.get(carrera_codigo)
-    await dbCarreras.close()
-    piloto_fetch = await dbPilotos.get('2024')
-    await dbPilotos.close()
-    historico_participantes = await dbHistorico.fetch()
-    for historico_participante in historico_participantes.items:
-        historico_quinielas = historico_participante['Quinielas']
-        quiniela = historico_participante['Quinielas'][carrera['key']]
-        historico_resultados = historico_participante['Resultados']
-        listaquiniela = quiniela['Lista'].split(',')
-        if quiniela['Carrera'] != carrera['key']:
-            resultados = {'normales':0, 'extras':0, 'penalizaciones':-5}
-        else:
-            resultados = {'normales':0, 'extras':0, 'penalizaciones':0}
-        pagosusuarios = await dbPagos.fetch([{'usuario':quiniela['key'], 'estado':'guardado'},
-                                             {'usuario':quiniela['key'], 'estado':'confirmado'}, 
-                                             {'usuario':quiniela['key'],'estado':'revision'} ])
-        rondas_pagadas = 0
-        rondas_confirmadas = 0
-        for pagousuario in pagosusuarios.items:
-            if str(pagousuario['carreras']) == 'Todas':
-                rondas_pagadas = int(controles['rondas'])
-            else:
-                rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
-            if pagousuario['estado'] == 'confirmado':
-                if pagousuario['carreras'] == 'Todas':
-                    rondas_confirmadas = int(controles['rondas'])
-                else:
-                    rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
-        if rondas_pagadas < int(carrera['Ronda']):
-            resultados['penalizaciones'] = resultados['penalizaciones'] - 5
-        # se termino revisar pagos
-        for i_lista in range(len(listaquiniela)):
-            piloto = listaquiniela[i_lista]
-            numero_piloto = ''
-            for n in piloto_fetch['Lista']:
-                if(piloto == piloto_fetch['Lista'][n]['codigo']):
-                    numero_piloto = n
-            if( numero_piloto in posiciones_dict):
-                resultados['normales'] = resultados['normales'] + posiciones_dict[numero_piloto]['puntos']
-                if(i_lista + 1 == posiciones_dict[numero_piloto]['posicion']):
-                    resultados['extras'] = resultados['extras'] + 2
-        historico_resultados[carrera['key']] = resultados
-        await dbHistorico.update(updates={ 
-            'Quinielas': historico_quinielas, 
-            'Resultados': historico_resultados, 
-            }, key=quiniela['key'])
-    await dbHistorico.close()
-    await dbPagos.close()
+    restulados_carrera = []
+    for historico_quiniela in carrera.historicoquinielas_carrera:
+        penalizacion = 0
+        normales = 0
+        extras = 0
+        if carrera.id != historico_quiniela.quiniela_carrera_id:
+            penalizacion = penalizacion - 5
+        pagos_guardados, pagos_confirmados = pagos_usuario(historico_quiniela.usuario.pagos)
+        carreras_pagadas =  pagos_confirmados + pagos_guardados
+        if carreras_pagadas < carrera.ronda:
+            penalizacion = penalizacion - 5
+        lista_quiniela = historico_quiniela.quiniela_lista.split(",")
+        for idx, codigo in lista_quiniela:
+            piloto = sesion.query(Piloto).filter(Piloto.codigo == codigo).first()
+            numero_piloto = str(piloto.numero)
+            if numero_piloto in posiciones_dict:
+                normales = normales + posiciones_dict[numero_piloto]["puntos"]
+            if idx + 1 == posiciones_dict[numero_piloto]['posicion']:
+                extras = extras + 2
+        restulados_carrera.append(Resultado(usuario_id=historico_quiniela.usuario_id, carrera_id=carrera.id, puntos_normales=normales, puntos_extras=extras, penalizaciones=penalizacion))
+    sesion.add_all(restulados_carrera)
+    sesion.flush()
     
-async def crear_tabla_puntos(obj_carrera):
-    dbPuntosPilotos = deta.AsyncBase("PuntosPilotos")
-    dbPilotos = deta.AsyncBase("Pilotos")
+def crear_tabla_puntos(sesion, carrera:Carrera):
     tabla_puntos_piloto = PrettyTable()
-    tabla_puntos_piloto.title = obj_carrera['Nombre']
+    tabla_puntos_piloto.title = carrera.nombre
     tabla_puntos_piloto.field_names = ["Pos", "Nombre", "Equipo", "Puntos", "Intervalo"]
     tabla_puntos_piloto.sortby = "Pos"
-    resultado_pilotos = await dbPuntosPilotos.get(obj_carrera['key'])
-    await dbPuntosPilotos.close()
-    detalles_piloto = await dbPilotos.get('2024')
-    await dbPilotos.close()
-    detalles_piloto = detalles_piloto['Lista']
-    for numero, resultado in resultado_pilotos['Pilotos'].items():
-        tabla_puntos_piloto.add_row([resultado['posicion'], detalles_piloto[numero]['Nombre'] + ' ' + detalles_piloto[numero]['Apellido'], detalles_piloto[numero]['Equipo'], resultado['puntos'], resultado['intervalo']])
+    resultado_pilotos = carrera.puntospilotoscarreras
+    for puntos_piloto in resultado_pilotos:
+        tabla_puntos_piloto.add_row([puntos_piloto.posicion, puntos_piloto.piloto.nombre + ' ' + puntos_piloto.piloto.apellido, puntos_piloto.piloto.equipo, puntos_piloto.puntos, puntos_piloto.intervalo])
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
     letra = ImageFont.truetype("Menlo.ttc", 15)
@@ -146,20 +100,14 @@ async def crear_tabla_puntos(obj_carrera):
     dibujo.text((10, 10), str(tabla_puntos_piloto), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablapilotostamano[3] + 20), "Resultados tomados de la pagina oficial de Formula 1", font=letraabajo, fill="black")
-    return im, obj_carrera['Nombre']
+    return im
 
-def crear_tabla_quinielas(sesion, carrera_en_curso, enmascarada=False):
+def crear_tabla_quinielas(carrera_en_curso, enmascarada=False):
     """Crear la tabla de las quinielas en una imagen."""
-    # carrera_nombre = carrera_en_curso['Nombre']
-    # carrera_clave = carrera_en_curso['key']
-    
     tablaquiniela = PrettyTable()
     tablaquiniela.title = carrera_en_curso.nombre
     tablaquiniela.field_names = ["Fecha/hora", "Nombre", "P1", "P2", "P3", "P4", "P5", "P6", "P7",]
     tablaquiniela.sortby = "Fecha/hora"
-    # dbQuiniela = deta.AsyncBase('Quiniela')
-    # datosquiniela = await dbQuiniela.fetch({'Carrera':carrera_clave})
-    # filas = datosquiniela.items    
     quinielas = carrera_en_curso.quinielas
     im = Image.new("RGB", (200, 200), "white")
     fig = 'No hay carreras archivadas.'
@@ -204,8 +152,6 @@ def crear_tabla_quinielas(sesion, carrera_en_curso, enmascarada=False):
         dibujo.text((10, 10), str(tablaquiniela), font=letra, fill="black")
         letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tablaquinielatamano[3] + 20), "Fecha y hora con el horario de GDL", font=letraabajo, fill="black")
-    # await dbQuiniela.close()
-    
     return im, fig
 
 def plotBarHorizontal(results, category_names):
@@ -230,127 +176,108 @@ def plotBarHorizontal(results, category_names):
 
     return fig, ax
 
-async def crear_tabla_general():
+def crear_tabla_general(sesion):
     tablaresultados = PrettyTable()
     tablaresultados.title = 'Tabla General Quiniela F1'
     tablaresultados.field_names = ["Nombre", "Puntos Totales", "Puntos Pilotos", "Puntos Extras", "Penalizaciones"]
     tablaresultados.sortby = "Puntos Totales"
     tablaresultados.reversesort = True
-    dbHistorico = deta.AsyncBase('Historico')
-    dbCarreras = deta.AsyncBase('Carreras')
-    resultados_historicos = await dbHistorico.fetch()
-    carreras_archivadas = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
-    total_rondas = carreras_archivadas.count
+    usuarios = sesion.query(Usuario).all()
+    carreras_archivadas = sesion.query(Carrera).filter(Carrera.estado == "ARCHIVADA").all()
+    total_rondas = len(carreras_archivadas)
     im = Image.new("RGB", (200, 200), "white")
     if total_rondas > 0:
-        for usuario in resultados_historicos.items:
+        for usuario in usuarios:
             normales = 0
             extras = 0
             penalizaciones = 0
-            for carrera in usuario['Resultados']:
-                if any(d['key'] == carrera for d in carreras_archivadas.items):
-                    normales = normales + usuario['Resultados'][carrera]['normales']
-                    extras = extras + usuario['Resultados'][carrera]['extras']
-                    penalizaciones = penalizaciones + usuario['Resultados'][carrera]['penalizaciones']
-            tablaresultados.add_row([usuario["Nombre"], normales + extras + penalizaciones, normales, extras, penalizaciones])   
+            for resultado in usuario.resultados:
+                normales = normales + resultado.puntos_normales
+                extras = extras + resultado.puntos_extras
+                penalizaciones = penalizaciones + resultado.penalizaciones
+            tablaresultados.add_row([usuario.obtener_nombre_completo(), normales + extras + penalizaciones, normales, extras, penalizaciones])   
         dibujo = ImageDraw.Draw(im)
         letra = ImageFont.truetype("Menlo.ttc", 15)
         tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
         im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
         dibujo = ImageDraw.Draw(im)
-        dibujo = poner_fondo_gris(dibujo, resultados_historicos.count, tablaresultados_tamano[2])
+        dibujo = poner_fondo_gris(dibujo, len(carreras_archivadas), tablaresultados_tamano[2])
         dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
         letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tablaresultados_tamano[3] + 20), "Total de rondas incluidas: " + str(total_rondas), font=letraabajo, fill="black")
-    await dbHistorico.close()
-    await dbCarreras.close()
     return im, total_rondas
 
-async def crear_tabla_resultados():
-    dbCarreras = deta.AsyncBase('Carreras')
-    dbHistorico = deta.AsyncBase('Historico')
-    carreras = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
-    maximo_horario = datetime.fromisoformat('2023-01-01T00:00:00.000+00:00')
-    ultima_carrera_archivada = ''
+def crear_tabla_resultados(sesion, carrera:Carrera|None):
+    carreras_archivadas = []
     im = Image.new("RGB", (200, 200), "white")
     texto_ganador = 'No hay carreras archivadas.'
-    if carreras.count > 0:
-        for carrera in carreras.items:
-            horario_Carrera = datetime.fromisoformat(carrera['Termino'])
-            if(horario_Carrera > maximo_horario):
-                maximo_horario = horario_Carrera
-                ultima_carrera_archivada = carrera['key']
-        
-        carrera_codigo = ultima_carrera_archivada
-        carrera_dict = await dbCarreras.get(carrera_codigo)
-        carrera_nombre = carrera_dict['Nombre']
-        tablaresultados = PrettyTable()
-        tablaresultados.title = carrera_nombre
-        tablaresultados.field_names = ["Nombre", "Puntos Totales", "Puntos Pilotos", "Puntos Extras", "Penalizaciones"]
-        datosHistoricos = await dbHistorico.fetch()
-        usuarios = datosHistoricos.items
-        listaresultados = []
-
-        for index in range(datosHistoricos.count):
-            usuario = usuarios[index]
-            puntos_totales = usuario['Resultados'][carrera_codigo]['normales'] + usuario['Resultados'][carrera_codigo]['extras'] + usuario['Resultados'][carrera_codigo]['penalizaciones']
-            listaresultados.append([usuario["Nombre"], puntos_totales, usuario['Resultados'][carrera_codigo]['normales'], usuario['Resultados'][carrera_codigo]['extras'], usuario['Resultados'][carrera_codigo]['penalizaciones']])
-        listaresultados.sort(key=itemgetter(4,1), reverse=True)
-
-        linea = False
-        ganador = ''
-        puntos_ganador = 0
-        texto_ganador = 'El ganador de la carrera ' + carrera_nombre + ' es: '
-        for index in range(len(listaresultados)):
-            resultado = listaresultados[index]
-            siguiente_resultado = listaresultados[min(index + 1, len(listaresultados) - 1) ]
-            if index == 0:
-                ganador = resultado[0]
-                puntos_ganador = resultado[1]
-            else:
-                if (resultado[1] == puntos_ganador and resultado[4] >= 0):
-                    ganador = ganador + ', ' + resultado[0]
-                    texto_ganador = 'Los ganadores de la carrera ' + carrera_nombre + ' son: '
-            if(siguiente_resultado[4] < 0 and not linea):
-                tablaresultados.add_row(resultado,  divider=True)
-                linea = True
-            else:
-                tablaresultados.add_row(resultado)
-        if puntos_ganador >= 90:
-            texto_ganador = texto_ganador + ganador + '. Con un total de ' + str(puntos_ganador) + ' puntos.'
+    if not carrera:
+        carreras_archivadas = sesion.query(Carrera).filter(Carrera.estado == "ARCHIVADA", Carrera.estado == "NO_ENVIADA").all()
+        carreras_archivadas.sort(key=lambda x: x.hora_empiezo, reverse = True)
+        if len(carreras_archivadas) > 0:
+            carrera = carreras_archivadas[0]
         else:
-            texto_ganador = 'No hubo ganador para la carrera: ' + carrera_nombre + '. Nadie logro hacer 90 puntos o mas. El premio se acumula para la /proxima carrera.'
-        im = Image.new("RGB", (200, 200), "white")
-        dibujo = ImageDraw.Draw(im)
-        letra = ImageFont.truetype("Menlo.ttc", 15)
-        tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
-        im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
-        dibujo = ImageDraw.Draw(im)
-        dibujo = poner_fondo_gris(dibujo, datosHistoricos.count, tablaresultados_tamano[2])
-        dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
-        letraabajo = ImageFont.truetype("Menlo.ttc", 10)
-        dibujo.text((20, tablaresultados_tamano[3] + 20), "Los que tienen penalizaciones no pueden ganar el premio, estan en la segunda seccion de la tabla", font=letraabajo, fill="black")
-    await dbCarreras.close()
-    await dbHistorico.close()
+            return im, texto_ganador
+    tablaresultados = PrettyTable()
+    tablaresultados.title = carrera.nombre
+    tablaresultados.field_names = ["Nombre", "Puntos Totales", "Puntos Pilotos", "Puntos Extras", "Penalizaciones"]
+    listaresultados = []
+    for resultado in carrera.resultados:
+        puntos_totales = resultado.puntos_normales + resultado.puntos_extras + resultado.penalizaciones
+        listaresultados.append([resultado.usuario.obtener_nombre_completo(), puntos_totales, resultado.puntos_normales, resultado.puntos_extras, resultado.penalizaciones])
+    listaresultados.sort(key=itemgetter(4,1), reverse=True)
+    linea = False
+    ganador = ''
+    puntos_ganador = 0
+    texto_ganador = 'El ganador de la carrera ' + carrera.nombre + ' es: '
+    for index in range(len(listaresultados)):
+        resultado = listaresultados[index]
+        siguiente_resultado = listaresultados[min(index + 1, len(listaresultados) - 1) ]
+        if index == 0:
+            ganador = resultado[0]
+            puntos_ganador = resultado[1]
+        else:
+            if (resultado[1] == puntos_ganador and resultado[4] >= 0):
+                ganador = ganador + ', ' + resultado[0]
+                texto_ganador = 'Los ganadores de la carrera ' + carrera.nombre + ' son: '
+        if(siguiente_resultado[4] < 0 and not linea):
+            tablaresultados.add_row(resultado,  divider=True)
+            linea = True
+        else:
+            tablaresultados.add_row(resultado)
+    if puntos_ganador >= 90:
+        texto_ganador = texto_ganador + ganador + '. Con un total de ' + str(puntos_ganador) + ' puntos.'
+    else:
+        texto_ganador = 'No hubo ganador para la carrera: ' + carrera.nombre + '. Nadie logro hacer 90 puntos o mas. El premio se acumula para la /proxima carrera.'
+    im = Image.new("RGB", (200, 200), "white")
+    dibujo = ImageDraw.Draw(im)
+    letra = ImageFont.truetype("Menlo.ttc", 15)
+    tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
+    im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
+    dibujo = ImageDraw.Draw(im)
+    dibujo = poner_fondo_gris(dibujo, len(carrera.resultados), tablaresultados_tamano[2])
+    dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
+    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
+    dibujo.text((20, tablaresultados_tamano[3] + 20), "Los que tienen penalizaciones no pueden ganar el premio, estan en la segunda seccion de la tabla", font=letraabajo, fill="black")
     return im, texto_ganador
 
-async def detalle_individual_historico(usuario):
-    dbHistorico = deta.AsyncBase('Historico')
-    dbCarreras = deta.AsyncBase('Carreras')
-    mi_historico = await dbHistorico.get(usuario)
+def detalle_individual_historico(telegram_id):
+    usuario = None
+    with Session() as sesion:
+        usuario = sesion.query(Usuario).filter(Usuario.telegram_id == telegram_id).first()
+    mis_resultados = usuario.resultados
     im = Image.new("RGB", (200, 200), "white")
     texto_mensaje = 'No hay carreras archivadas.'
-    if mi_historico is not None:
+    if len(mis_resultados)> 0:
         tabla_historico_puntos = PrettyTable()
         tabla_historico_puntos.title = 'Tabla de puntos obtenidos por carrera'
         tabla_historico_puntos.field_names = ["Ronda", "Nombre", "Puntos Totales", "Puntos Piloto","Puntos Extras", "Penaizaciones"]
         tabla_historico_puntos.sortby = "Ronda"
         puntos_totales = 0
-        for codigo_carrera, puntos in mi_historico['Resultados'].items():
-            carrera = await dbCarreras.get(codigo_carrera)
-            puntos_carrera = puntos['normales'] + puntos['extras'] + puntos['penalizaciones']
+        for mi_resultado in mis_resultados:
+            puntos_carrera = mi_resultado.puntos_normales + mi_resultado.puntos_extras + mi_resultado.penalizaciones
             puntos_totales += puntos_carrera
-            tabla_historico_puntos.add_row([ int(carrera['Ronda']), carrera['Nombre'], puntos_carrera, puntos['normales'] , puntos['extras'], puntos['penalizaciones']])
+            tabla_historico_puntos.add_row([ int(mi_resultado.carrera.ronda), mi_resultado.carrera.nombre, puntos_carrera, mi_resultado.puntos_normales , mi_resultado.puntos_extras, mi_resultado.penalizaciones])
         texto_abajo = f'Total de puntos: {puntos_totales}'
         texto_mensaje = f'Este es el detalle de los puntos por carrera que has obtenido hasta el momento'
         im = Image.new("RGB", (200, 200), "white")
@@ -359,56 +286,48 @@ async def detalle_individual_historico(usuario):
         tabladetalletamano = dibujo.multiline_textbbox([0,0],str(tabla_historico_puntos),font=letra)
         im = im.resize((tabladetalletamano[2] + 20, tabladetalletamano[3] + 40))
         dibujo = ImageDraw.Draw(im)
-        dibujo = poner_fondo_gris(dibujo, len(mi_historico['Resultados']), tabladetalletamano[2])
+        dibujo = poner_fondo_gris(dibujo, len(mis_resultados), tabladetalletamano[2])
         dibujo.text((10, 10), str(tabla_historico_puntos), font=letra, fill="black")
         letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tabladetalletamano[3] + 20), texto_abajo, font=letra, fill="black")
-    await dbCarreras.close()
-    await dbHistorico.close()
     return im, texto_mensaje
 
-async def detalle_individual_puntos(usuario):
-    dbHistorico = deta.AsyncBase('Historico')
-    dbCarreras = deta.AsyncBase('Carreras')
-    dbPuntosPilotos = deta.AsyncBase("PuntosPilotos")
-    dbPilotos = deta.AsyncBase("Pilotos")
-    carreras = await dbCarreras.fetch([{'Estado':'ARCHIVADA'}, {'Estado':'NO_ENVIADA'}])
-    maximo_horario = datetime.fromisoformat('2023-01-01T00:00:00.000+00:00')
-    ultima_carrera_archivada = {}
+def detalle_individual_puntos(telegram_id):
+    usuario = None
+    ultimo_resultado = None
+    ultima_quiniela = None
+    resultado_pilotos = None
+    with Session() as sesion:
+        usuario = sesion.query(Usuario).filter(Usuario.telegram_id == telegram_id).first()
+        usuario.resultados.sort(key=lambda x: x.carrera.hora_empiezo, reverse = True)
+        ultimo_resultado = usuario.resultados[0]
+        ultima_quiniela = sesion.query(HistoricoQuiniela).filter(HistoricoQuiniela.usuario_id == usuario.id, HistoricoQuiniela.carrera_id == ultimo_resultado.carrera_id).first()
+        resultado_pilotos = sesion.query(PuntosPilotosCarrrera).all()
     im = Image.new("RGB", (200, 200), "white")
     texto_mensaje = 'No hay carreras archivadas.'
-    for carrera in carreras.items:
-        horario_Carrera = datetime.fromisoformat(carrera['Termino'])
-        if(horario_Carrera > maximo_horario):
-            maximo_horario = horario_Carrera
-            ultima_carrera_archivada = carrera
-    if carreras.count > 0:
+    if usuario.resultados > 0:
         tabla_detalle_puntos = PrettyTable()
-        tabla_detalle_puntos.title = ultima_carrera_archivada['Nombre']
+        tabla_detalle_puntos.title = ultimo_resultado.carrera.nombre
         tabla_detalle_puntos.field_names = ["Pos", "Piloto", "Puntos", "Tus Puntos", "Tus Extras"]
         tabla_detalle_puntos.sortby = "Pos"
-        resultado_pilotos = await dbPuntosPilotos.get(ultima_carrera_archivada['key'])
-        detalles_piloto = await dbPilotos.get('2024')
-        detalles_piloto = detalles_piloto['Lista']
-        mi_historico = await dbHistorico.get(usuario)
-        mi_lista = mi_historico['Quinielas'][ultima_carrera_archivada['key']]['Lista']
-        mi_quiniela_carrera = mi_historico['Quinielas'][ultima_carrera_archivada['key']]['Carrera']
-        mis_puntos_totales = mi_historico['Resultados'][ultima_carrera_archivada['key']]['extras'] + mi_historico['Resultados'][ultima_carrera_archivada['key']]['normales'] + mi_historico['Resultados'][ultima_carrera_archivada['key']]['penalizaciones']
-        mis_penalizaciones = mi_historico['Resultados'][ultima_carrera_archivada['key']]['penalizaciones']
-        mi_quiniela = mi_historico['Quinielas'][ultima_carrera_archivada['key']]['Lista'].split(',')
+        mi_lista = ultima_quiniela.quiniela_lista
+        mi_quiniela_carrera = ultima_quiniela.carrera.nombre
+        mis_puntos_totales = ultimo_resultado.puntos_normales + ultimo_resultado.puntos_extra + ultimo_resultado.penalizaciones
+        mis_penalizaciones = ultimo_resultado.penalizaciones
+        mi_quiniela = ultima_quiniela.quiniela_lista.split(',')
         texto_abajo = f'Tu quiniela: {mi_lista}'
         texto_mensaje = f'Tus puntos totales fueron: {mis_puntos_totales}, en la imagen puedes ver como los obtuviste. Tambien puedes revisar el documento de las reglas con el comando /ayuda para mas detalles'
         if mis_penalizaciones < 0:
             texto_mensaje = f'Tus puntos totales fueron: {mis_puntos_totales}, en la imagen puedes ver como obtuviste los puntos por pilotos y los puntos extras. Estuviste penalizado con {mis_penalizaciones} estos los debes de restar de los puntos de la imagen. Recuerda que puedes revisar las reglas con el comando /ayuda'
-        for numero, resultado in resultado_pilotos['Pilotos'].items():
+        for resultado_piloto in resultado_pilotos:
             mis_puntos_pilotos = 0
             mis_puntos_extras = 0
-            if detalles_piloto[numero]['codigo'] in mi_quiniela:
-                mis_puntos_pilotos = resultado['puntos']
-                mi_posicion = mi_quiniela.index(detalles_piloto[numero]['codigo']) + 1
-                if mi_posicion == resultado['posicion']:
+            if resultado_piloto.piloto.codigo in mi_quiniela:
+                mis_puntos_pilotos = resultado_piloto.puntos
+                mi_posicion = mi_quiniela.index(resultado_piloto.piloto.codigo) + 1
+                if mi_posicion == resultado_piloto.posicion:
                     mis_puntos_extras = 2
-            tabla_detalle_puntos.add_row([resultado['posicion'], detalles_piloto[numero]['codigo'] , resultado['puntos'], mis_puntos_pilotos , mis_puntos_extras])
+            tabla_detalle_puntos.add_row([resultado_piloto.posicion, resultado_piloto.piloto.codigo , resultado_piloto.puntos, mis_puntos_pilotos , mis_puntos_extras])
     
         dibujo = ImageDraw.Draw(im)
         letra = ImageFont.truetype("Menlo.ttc", 15)
@@ -419,11 +338,6 @@ async def detalle_individual_puntos(usuario):
         dibujo.text((10, 10), str(tabla_detalle_puntos), font=letra, fill="black")
         letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tabladetalletamano[3] + 20), texto_abajo, font=letra, fill="black")    
-    await dbCarreras.close()
-    await dbHistorico.close()
-    await dbPilotos.close()
-    await dbPuntosPilotos.close()
-    
     return im, texto_mensaje
 
 def pagos_usuario(usuario_pagos):

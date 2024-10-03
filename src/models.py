@@ -97,7 +97,7 @@ class HistoricoQuiniela(Base):
     __tablename__ = 'historicoquinielas'
 
     id = Column(Integer, primary_key=True)
-    usario_id = Column(Integer, ForeignKey('usuarios.id'))
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'))
     carrera_id = Column(Integer, ForeignKey('carreras.id'))
     quiniela_carrera_id = Column(Integer, ForeignKey('carreras.id'))
     quiniela_fechahora = Column(TIMESTAMP(timezone=True))
@@ -107,7 +107,7 @@ class HistoricoQuiniela(Base):
     usuario = relationship("Usuario", back_populates="historicoquinielas")
 
     def __init__(self, usuario_id, carrera_id, quiniela_carrera_id, quiniela_fechahora, quiniela_lista):
-        self.usario_id = usuario_id
+        self.usuario_id = usuario_id
         self.carrera_id = carrera_id
         self.quiniela_carrera_id = quiniela_carrera_id
         self.quiniela_fechahora = quiniela_fechahora
@@ -169,6 +169,13 @@ class Resultado(Base):
     penalizaciones = Column(Double)
     usuario = relationship("Usuario", back_populates="resultados")
     carrera = relationship("Carrera", back_populates="resultados")
+
+    def __init__(self, usuario_id, carrera_id, puntos_extras, puntos_normales, penalizaciones):
+        self.usuario_id = usuario_id
+        self.carrera_id = carrera_id
+        self.puntos_extras = puntos_extras
+        self.puntos_normales = puntos_normales
+        self.penalizaciones = penalizaciones
 
 class Pago(Base):
     __tablename__ = 'pagos'
