@@ -216,7 +216,7 @@ async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def mispuntos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Crear tabla con detalle de puntos por participante"""
     with Session() as sesion:
-        im, mensaje = detalle_individual_puntos(sesion=sesion telegram_id=update.message.from_user.id)
+        im, mensaje = detalle_individual_puntos(sesion=sesion, telegram_id=update.message.from_user.id)
     if mensaje == 'No hay carreras archivadas.':
         await update.message.reply_text(mensaje)
         return ConversationHandler.END
