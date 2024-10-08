@@ -96,7 +96,7 @@ def crear_tabla_puntos(sesion, carrera:Carrera):
     tablapilotostamano = dibujo.multiline_textbbox([0,0],str(tabla_puntos_piloto),font=letra)
     im = im.resize((tablapilotostamano[2] + 20, tablapilotostamano[3] + 40))
     dibujo = ImageDraw.Draw(im)
-    dibujo = poner_fondo_gris(dibujo, len(resultado_pilotos['Pilotos']), tablapilotostamano[2])
+    dibujo = poner_fondo_gris(dibujo, len(resultado_pilotos), tablapilotostamano[2])
     dibujo.text((10, 10), str(tabla_puntos_piloto), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablapilotostamano[3] + 20), "Resultados tomados de la pagina oficial de Formula 1", font=letraabajo, fill="black")
@@ -201,7 +201,7 @@ def crear_tabla_general(sesion):
         tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
         im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
         dibujo = ImageDraw.Draw(im)
-        dibujo = poner_fondo_gris(dibujo, len(carreras_archivadas), tablaresultados_tamano[2])
+        dibujo = poner_fondo_gris(dibujo, len(usuarios), tablaresultados_tamano[2])
         dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
         letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tablaresultados_tamano[3] + 20), "Total de rondas incluidas: " + str(total_rondas), font=letraabajo, fill="black")
@@ -261,10 +261,8 @@ def crear_tabla_resultados(sesion, carrera:Carrera|None):
     dibujo.text((20, tablaresultados_tamano[3] + 20), "Los que tienen penalizaciones no pueden ganar el premio, estan en la segunda seccion de la tabla", font=letraabajo, fill="black")
     return im, texto_ganador
 
-def detalle_individual_historico(telegram_id):
-    usuario = None
-    with Session() as sesion:
-        usuario = sesion.query(Usuario).filter(Usuario.telegram_id == telegram_id).first()
+def detalle_individual_historico(sesion, telegram_id):
+    usuario = sesion.query(Usuario).filter(Usuario.telegram_id == telegram_id).first()
     mis_resultados = usuario.resultados
     im = Image.new("RGB", (200, 200), "white")
     texto_mensaje = 'No hay carreras archivadas.'
@@ -292,27 +290,26 @@ def detalle_individual_historico(telegram_id):
         dibujo.text((20, tabladetalletamano[3] + 20), texto_abajo, font=letra, fill="black")
     return im, texto_mensaje
 
-def detalle_individual_puntos(telegram_id):
+def detalle_individual_puntos(sesion, telegram_id):
     usuario = None
     ultimo_resultado = None
     ultima_quiniela = None
     resultado_pilotos = None
-    with Session() as sesion:
-        usuario = sesion.query(Usuario).filter(Usuario.telegram_id == telegram_id).first()
-        usuario.resultados.sort(key=lambda x: x.carrera.hora_empiezo, reverse = True)
-        ultimo_resultado = usuario.resultados[0]
-        ultima_quiniela = sesion.query(HistoricoQuiniela).filter(HistoricoQuiniela.usuario_id == usuario.id, HistoricoQuiniela.carrera_id == ultimo_resultado.carrera_id).first()
-        resultado_pilotos = sesion.query(PuntosPilotosCarrrera).all()
+    usuario = sesion.query(Usuario).filter(Usuario.telegram_id == telegram_id).first()
+    usuario.resultados.sort(key=lambda x: x.carrera.hora_empiezo, reverse = True)
+    ultimo_resultado = usuario.resultados[0]
+    ultima_quiniela = sesion.query(HistoricoQuiniela).filter(HistoricoQuiniela.usuario_id == usuario.id, HistoricoQuiniela.carrera_id == ultimo_resultado.carrera_id).first()
+    resultado_pilotos = sesion.query(PuntosPilotosCarrrera).filter(PuntosPilotosCarrrera.carrera_id == ultimo_resultado.carrera_id).all()
     im = Image.new("RGB", (200, 200), "white")
     texto_mensaje = 'No hay carreras archivadas.'
-    if usuario.resultados > 0:
+    if len(usuario.resultados) > 0:
         tabla_detalle_puntos = PrettyTable()
         tabla_detalle_puntos.title = ultimo_resultado.carrera.nombre
         tabla_detalle_puntos.field_names = ["Pos", "Piloto", "Puntos", "Tus Puntos", "Tus Extras"]
         tabla_detalle_puntos.sortby = "Pos"
         mi_lista = ultima_quiniela.quiniela_lista
         mi_quiniela_carrera = ultima_quiniela.carrera.nombre
-        mis_puntos_totales = ultimo_resultado.puntos_normales + ultimo_resultado.puntos_extra + ultimo_resultado.penalizaciones
+        mis_puntos_totales = ultimo_resultado.puntos_normales + ultimo_resultado.puntos_extras + ultimo_resultado.penalizaciones
         mis_penalizaciones = ultimo_resultado.penalizaciones
         mi_quiniela = ultima_quiniela.quiniela_lista.split(',')
         texto_abajo = f'Tu quiniela: {mi_lista}'
@@ -334,7 +331,7 @@ def detalle_individual_puntos(telegram_id):
         tabladetalletamano = dibujo.multiline_textbbox([0,0],str(tabla_detalle_puntos),font=letra)
         im = im.resize((tabladetalletamano[2] + 20, tabladetalletamano[3] + 40))
         dibujo = ImageDraw.Draw(im)
-        dibujo = poner_fondo_gris(dibujo, len(resultado_pilotos['Pilotos']), tabladetalletamano[2])
+        dibujo = poner_fondo_gris(dibujo, len(resultado_pilotos), tabladetalletamano[2])
         dibujo.text((10, 10), str(tabla_detalle_puntos), font=letra, fill="black")
         letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tabladetalletamano[3] + 20), texto_abajo, font=letra, fill="black")    

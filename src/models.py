@@ -69,6 +69,14 @@ class Piloto(Base):
     acumulado_puntos = Column(Double)
     puntospilotoscarreras = relationship("PuntosPilotosCarrrera", back_populates="piloto")
 
+    def __init__(self, numero, nombre, apellido, codigo, equipo, acumulado_puntos):
+        self.numero = numero
+        self.nombre = nombre
+        self.apellido = apellido
+        self.codigo = codigo
+        self.equipo = equipo
+        self.acumulado_puntos = acumulado_puntos
+
     @staticmethod
     def obtener_pilotos(session):
         return session.query(Piloto).all()

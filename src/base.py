@@ -13,7 +13,7 @@ connection_string = URL.create(
     username = db_user,
     password= db_password,
     host=db_host,
-    database='QuinielaFormula1',
+    database='quinielaF1',
 )
 
 engine = create_engine(connection_string)
