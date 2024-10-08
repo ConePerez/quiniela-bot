@@ -645,7 +645,7 @@ async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Sends a picture"""
     # aggregar un if, si hay carrera en curso mandar mensaje de espera
     with Session() as sesion:
-        im, texto = crear_tabla_resultados(None, sesion)
+        im, texto = crear_tabla_resultados(sesion, None)
     if texto == 'No hay carreras archivadas.':
         await update.message.reply_text(texto)
         return ConversationHandler.END
@@ -1048,7 +1048,7 @@ ptb.add_handler(conv_teclado)
 async def enviar_pagos(context: ContextTypes.DEFAULT_TYPE):
     pagos_por_enviar = None
     with Session() as sesion:
-        pagos_por_enviar = sesion.query(Pago).filter(Pago.estado == 'confirmado' & Pago.enviado == False).all()
+        pagos_por_enviar = sesion.query(Pago).filter((Pago.estado == 'confirmado') & (Pago.enviado == False)).all()
         if len(pagos_por_enviar) > 0:
             for pago in pagos_por_enviar:
                 usuario = sesion.get(Usuario, pago.usuario_id)
