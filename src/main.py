@@ -645,7 +645,7 @@ async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Sends a picture"""
     # aggregar un if, si hay carrera en curso mandar mensaje de espera
     with Session() as sesion:
-        im, texto = crear_tabla_resultados(carrera=None, sesion=sesion)
+        im, texto = crear_tabla_resultados(None, sesion)
     if texto == 'No hay carreras archivadas.':
         await update.message.reply_text(texto)
         return ConversationHandler.END
