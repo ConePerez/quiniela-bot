@@ -203,7 +203,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Crear tabla con detalle de puntos por carrera de un participante"""
     with Session() as sesion:
-        im, mensaje = await detalle_individual_historico(sesion=sesion, telegram_id=update.message.from_user.id)
+        im, mensaje = detalle_individual_historico(sesion=sesion, telegram_id=update.message.from_user.id)
     if mensaje == 'No hay carreras archivadas.':
         await update.message.reply_text(mensaje)
         return ConversationHandler.END
@@ -261,12 +261,12 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # poner_fondo_gris(dibujo=dibujo, total_filas=datosquiniela.count, largo_fila=tablapagostamano[2])
     dibujo.text((10, 10), str(tablapagos), font=letra, fill="black")
     letraabajo = ImageFont.truetype("Menlo.ttc", 10)
-    dibujo.text((20, tablapagostamano[3] + 20), "Ronda actual: " + total_carreras, font=letraabajo, fill="black")
+    dibujo.text((20, tablapagostamano[3] + 20), "Ronda actual: " + str(total_carreras), font=letraabajo, fill="black")
 
     with BytesIO() as tablapagos_imagen:    
         im.save(tablapagos_imagen, "png")
         tablapagos_imagen.seek(0)
-        await update.message.reply_photo(tablapagos_imagen, caption='Tabla de pagos al momento, asegurate de tener ' + total_carreras + ' carreras pagadas para poder entrar sin penalizacion a la /proxima carrera.')
+        await update.message.reply_photo(tablapagos_imagen, caption='Tabla de pagos al momento, asegurate de tener ' + str(total_carreras) + ' carreras pagadas para poder entrar sin penalizacion a la /proxima carrera.')
     
     return ConversationHandler.END
 
@@ -592,8 +592,7 @@ async def finpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Sends a picture"""
-    carreras = dbCarreras.fetch([{'Estado':'EN-CURSO'}, {'Estado':'IDLE'}])
+    """Sends a picture"""   
     carrera = None
     with Session() as sesion:
         carrera = sesion.query(Carrera).filter(or_(Carrera.estado == 'EN-CURSO', Carrera.estado == 'IDLE')).first()
@@ -646,7 +645,7 @@ async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Sends a picture"""
     # aggregar un if, si hay carrera en curso mandar mensaje de espera
     with Session() as sesion:
-        im, texto = await crear_tabla_resultados(carrera=None, sesion=sesion)
+        im, texto = crear_tabla_resultados(carrera=None, sesion=sesion)
     if texto == 'No hay carreras archivadas.':
         await update.message.reply_text(texto)
         return ConversationHandler.END
