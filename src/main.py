@@ -595,9 +595,9 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Sends a picture"""   
     carrera = None
     with Session() as sesion:
-        carrera = sesion.query(Carrera).filter(or_(Carrera.estado == 'EN-CURSO', Carrera.estado == 'IDLE')).first()
-    if len(carreras) > 0:
-        horario_qualy = datetime.fromisoformat(carreras.items[0]['q']['hora_empiezo'])
+        carrera = sesion.query(Carrera).filter(Carrera.estado == 'EN-CURSO' | Carrera.estado == 'IDLE').first()
+    if len(carrera) > 0:
+        horario_qualy = datetime.fromisoformat(carrera.hora_empiezo)
         ahora = datetime.now()
         ahora = ahora.astimezone()
         enmascarar = True
@@ -1048,7 +1048,7 @@ ptb.add_handler(conv_teclado)
 async def enviar_pagos(context: ContextTypes.DEFAULT_TYPE):
     pagos_por_enviar = None
     with Session() as sesion:
-        pagos_por_enviar = sesion.query(Pago).filter(Pago.estado == 'confirmado', Pago.enviado == False).all()
+        pagos_por_enviar = sesion.query(Pago).filter(Pago.estado == 'confirmado' & Pago.enviado == False).all()
         if len(pagos_por_enviar) > 0:
             for pago in pagos_por_enviar:
                 usuario = sesion.get(Usuario, pago.usuario_id)
