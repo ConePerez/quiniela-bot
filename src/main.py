@@ -202,7 +202,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Crear tabla con detalle de puntos por carrera de un participante"""
-    im, mensaje = await detalle_individual_historico(str(update.message.from_user.id))
+    with Session() as sesion:
+        im, mensaje = await detalle_individual_historico(sesion=sesion, telegram_id=update.message.from_user.id)
     if mensaje == 'No hay carreras archivadas.':
         await update.message.reply_text(mensaje)
         return ConversationHandler.END
@@ -214,7 +215,8 @@ async def mihistorico(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def mispuntos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Crear tabla con detalle de puntos por participante"""
-    im, mensaje = await detalle_individual_puntos(str(update.message.from_user.id))
+    with Session() as sesion:
+        im, mensaje = detalle_individual_puntos(sesion=sesion telegram_id=update.message.from_user.id)
     if mensaje == 'No hay carreras archivadas.':
         await update.message.reply_text(mensaje)
         return ConversationHandler.END
@@ -592,7 +594,10 @@ async def finpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Sends a picture"""
     carreras = dbCarreras.fetch([{'Estado':'EN-CURSO'}, {'Estado':'IDLE'}])
-    if(carreras.count > 0):
+    carrera = None
+    with Session() as sesion:
+        carrera = sesion.query(Carrera).filter(or_(Carrera.estado == 'EN-CURSO', Carrera.estado == 'IDLE')).first()
+    if len(carreras) > 0:
         horario_qualy = datetime.fromisoformat(carreras.items[0]['q']['hora_empiezo'])
         ahora = datetime.now()
         ahora = ahora.astimezone()
@@ -601,16 +606,16 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if(ahora > horario_qualy):
             enmascarar = False
             mensaje = "Quinielas para ronda: "
-        im, carrera_nombre, graficaPilotosPos = await crear_tabla_quinielas(carreras.items[0], enmascarar)
+        im, graficaPilotosPos = await crear_tabla_quinielas(carrera_en_curso=carrera, enmascarada=enmascarar)
         if graficaPilotosPos == 'No hay carreras archivadas.':
             await update.message.reply_text(graficaPilotosPos)
             return ConversationHandler.END
         with BytesIO() as tablaquinielaimagen:    
             im.save(tablaquinielaimagen, "png")
             tablaquinielaimagen.seek(0)
-            await update.message.reply_photo(tablaquinielaimagen, caption= mensaje + carrera_nombre)
+            await update.message.reply_photo(tablaquinielaimagen, caption= mensaje + carrera.nombre)
         if not enmascarar:
-            texto = "Grafica de los pilotos para la carrera de " + carrera_nombre
+            texto = "Grafica de los pilotos para la carrera de " + carrera.nombre
             with BytesIO() as graficaPilotosPos_imagen:    
                 graficaPilotosPos.savefig(graficaPilotosPos_imagen)
                 graficaPilotosPos_imagen.seek(0)
@@ -626,7 +631,8 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 async def general(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    im, total_rondas = await crear_tabla_general()
+    with Session() as sesion:
+        im, total_rondas = crear_tabla_general(sesion=sesion)
     if total_rondas == 0:
         await update.message.reply_text('No hay carreras archivadas.')
         return ConversationHandler.END
@@ -639,7 +645,8 @@ async def general(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def resultados(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Sends a picture"""
     # aggregar un if, si hay carrera en curso mandar mensaje de espera
-    im, texto = await crear_tabla_resultados()
+    with Session() as sesion:
+        im, texto = await crear_tabla_resultados(carrera=None, sesion=sesion)
     if texto == 'No hay carreras archivadas.':
         await update.message.reply_text(texto)
         return ConversationHandler.END
@@ -1043,7 +1050,7 @@ async def enviar_pagos(context: ContextTypes.DEFAULT_TYPE):
     pagos_por_enviar = None
     with Session() as sesion:
         pagos_por_enviar = sesion.query(Pago).filter(Pago.estado == 'confirmado', Pago.enviado == False).all()
-        if pagos_por_enviar:
+        if len(pagos_por_enviar) > 0:
             for pago in pagos_por_enviar:
                 usuario = sesion.get(Usuario, pago.usuario_id)
                 texto = 'Este pago ya fue ' + pago.estado + ' por el tesorero. Puedes revisar cuantas carreras tienes pagadas con el comando de /misaldo'
