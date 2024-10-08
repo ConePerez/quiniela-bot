@@ -596,7 +596,7 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     carrera = None
     with Session() as sesion:
         carrera = sesion.query(Carrera).filter((Carrera.estado == 'EN-CURSO') | (Carrera.estado == 'IDLE')).first()
-    if len(carrera) > 0:
+    if carrera:
         horario_qualy = datetime.fromisoformat(carrera.hora_empiezo)
         ahora = datetime.now()
         ahora = ahora.astimezone()
