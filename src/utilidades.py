@@ -212,7 +212,7 @@ def crear_tabla_resultados(sesion, carrera:Carrera|None):
     im = Image.new("RGB", (200, 200), "white")
     texto_ganador = 'No hay carreras archivadas.'
     if carrera is None:
-        carreras_archivadas = sesion.query(Carrera).filter(Carrera.estado == "ARCHIVADA" & Carrera.estado == "NO_ENVIADA").all()
+        carreras_archivadas = sesion.query(Carrera).filter(Carrera.estado == "ARCHIVADA" | Carrera.estado == "NO_ENVIADA").all()
         carreras_archivadas.sort(key=lambda x: x.hora_empiezo, reverse = True)
         if len(carreras_archivadas) > 0:
             carrera = carreras_archivadas[0]
