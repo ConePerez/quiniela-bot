@@ -232,41 +232,32 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # total_carreras = str(carreras.count)
     total_carreras = 0
     # configuracion = dbConfiguracion.get('controles')
-    tablapagos = PrettyTable()
-    tablapagos.title = 'Tabal de pagos'
-    tablapagos.field_names = ["Nombre", "Total Rondas", "Rondas Pagadas", "Rondas Confirmadas"]
-    tablapagos.sortby = "Nombre"
-    # datosquiniela = dbQuiniela.fetch()
-    # for usuarioquiniela in datosquiniela.items:
-    #     pagosusuarios = dbPagos.fetch([{'usuario':usuarioquiniela['key'], 'estado':'guardado'},{'usuario':usuarioquiniela['key'], 'estado':'confirmado'} ])
-    #     rondas_pagadas = 0
-    #     rondas_confirmadas = 0
-    #     for pagousuario in pagosusuarios.items:
-    #         if str(pagousuario['carreras']) == 'Todas':
-    #             rondas_pagadas = configuracion['rondas']
-    #         else:
-    #             rondas_pagadas = int(pagousuario['carreras']) + rondas_pagadas
-    #         if pagousuario['estado'] == 'confirmado':
-    #             if pagousuario['carreras'] == 'Todas':
-    #                 rondas_confirmadas = configuracion['rondas']
-    #             else:
-    #                 rondas_confirmadas = int(pagousuario['carreras']) + rondas_confirmadas
-    #     tablapagos.add_row([usuarioquiniela['Nombre'], configuracion['rondas'], str(rondas_pagadas), str(rondas_confirmadas)]) 
-    im = Image.new("RGB", (200, 200), "white")
-    dibujo = ImageDraw.Draw(im)
-    letra = ImageFont.truetype("Menlo.ttc", 15)
-    tablapagostamano = dibujo.multiline_textbbox([0,0],str(tablapagos),font=letra)
-    im = im.resize((tablapagostamano[2] + 20, tablapagostamano[3] + 40))
-    dibujo = ImageDraw.Draw(im)
-    # poner_fondo_gris(dibujo=dibujo, total_filas=datosquiniela.count, largo_fila=tablapagostamano[2])
-    dibujo.text((10, 10), str(tablapagos), font=letra, fill="black")
-    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
-    dibujo.text((20, tablapagostamano[3] + 20), "Ronda actual: " + str(total_carreras), font=letraabajo, fill="black")
+    with Session() as sesion:
+        carreras = sesion.query(Carrera).filter((Carrera.estado == 'ARCHIVADA') | (Carrera.estado == "CANCELADA")).all()
+        total_carreras = str(len(carreras))
+        tablapagos = PrettyTable()
+        tablapagos.title = 'Tabal de pagos'
+        tablapagos.field_names = ["Nombre", "Total Rondas", "Rondas Pagadas", "Rondas Confirmadas"]
+        tablapagos.sortby = "Nombre"
+        usuarios = sesion.query(Usuario).all()
+        for usuario in usuarios:
+            rondas_pagadas, rondas_confirmadas = pagos_usuario(usuario.pagos)
+            tablapagos.add_row([usuario.obtener_nombre_completo(), '24', str(rondas_pagadas), str(rondas_confirmadas)]) 
+        im = Image.new("RGB", (200, 200), "white")
+        dibujo = ImageDraw.Draw(im)
+        letra = ImageFont.truetype("Menlo.ttc", 15)
+        tablapagostamano = dibujo.multiline_textbbox([0,0],str(tablapagos),font=letra)
+        im = im.resize((tablapagostamano[2] + 20, tablapagostamano[3] + 40))
+        dibujo = ImageDraw.Draw(im)
+        # poner_fondo_gris(dibujo=dibujo, total_filas=datosquiniela.count, largo_fila=tablapagostamano[2])
+        dibujo.text((10, 10), str(tablapagos), font=letra, fill="black")
+        letraabajo = ImageFont.truetype("Menlo.ttc", 10)
+        dibujo.text((20, tablapagostamano[3] + 20), "Ronda actual: " + str(total_carreras), font=letraabajo, fill="black")
 
-    with BytesIO() as tablapagos_imagen:    
-        im.save(tablapagos_imagen, "png")
-        tablapagos_imagen.seek(0)
-        await update.message.reply_photo(tablapagos_imagen, caption='Tabla de pagos al momento, asegurate de tener ' + str(total_carreras) + ' carreras pagadas para poder entrar sin penalizacion a la /proxima carrera.')
+        with BytesIO() as tablapagos_imagen:    
+            im.save(tablapagos_imagen, "png")
+            tablapagos_imagen.seek(0)
+            await update.message.reply_photo(tablapagos_imagen, caption='Tabla de pagos al momento, asegurate de tener ' + str(total_carreras) + ' carreras pagadas para poder entrar sin penalizacion a la /proxima carrera.')
     
     return ConversationHandler.END
 
