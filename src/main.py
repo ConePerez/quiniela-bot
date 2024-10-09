@@ -609,7 +609,7 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             if(ahora > horario_qualy):
                 enmascarar = False
                 mensaje = "Quinielas para ronda: "
-            im, graficaPilotosPos = await crear_tabla_quinielas(carrera_en_curso=carrera, enmascarada=enmascarar)
+            im, graficaPilotosPos = crear_tabla_quinielas(carrera_en_curso=carrera, enmascarada=enmascarar)
             if graficaPilotosPos == 'No hay carreras archivadas.':
                 await update.message.reply_text(graficaPilotosPos)
                 return ConversationHandler.END
@@ -1063,7 +1063,7 @@ async def enviar_pagos(context: ContextTypes.DEFAULT_TYPE):
                     reply_to_message_id=pago.mensaje
                 )                
                 pago.enviado = True
-                sesion.commit()
+            sesion.commit()
     return
 
 async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
