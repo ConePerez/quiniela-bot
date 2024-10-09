@@ -249,7 +249,7 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         tablapagostamano = dibujo.multiline_textbbox([0,0],str(tablapagos),font=letra)
         im = im.resize((tablapagostamano[2] + 20, tablapagostamano[3] + 40))
         dibujo = ImageDraw.Draw(im)
-        # poner_fondo_gris(dibujo=dibujo, total_filas=datosquiniela.count, largo_fila=tablapagostamano[2])
+        poner_fondo_gris(dibujo=dibujo, total_filas=len(usuarios), largo_fila=tablapagostamano[2])
         dibujo.text((10, 10), str(tablapagos), font=letra, fill="black")
         letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tablapagostamano[3] + 20), "Ronda actual: " + str(total_carreras), font=letraabajo, fill="black")
@@ -543,6 +543,12 @@ async def pagovalidado(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int
         pago_validado = sesion.get(Pago, context.user_data['pago'])
         pago_validado.estado = 'confirmado'
         sesion.commit()
+        texto = 'Este pago ya fue ' + pago_validado.estado + ' por el tesorero. Puedes revisar cuantas carreras tienes pagadas con el comando de /misaldo'
+        await context.bot.send_message(
+            pago_validado.usuario.telegram_id, 
+            text=texto,
+            reply_to_message_id=pago_validado.mensaje
+        ) 
         context.user_data['procesados'] = context.user_data['procesados'] + 1
         await update.message.reply_text(
                 'Pago validado ¿quieres procesar otro pago?', 
@@ -558,6 +564,14 @@ async def pagorechazado(update:Update, context: ContextTypes.DEFAULT_TYPE) -> in
     with Session() as sesion:
         pago_rechazado = sesion.get(Pago, context.user_data['pago'])
         context.user_data['procesados'] = context.user_data['procesados'] + 1
+        pago_rechazado.estado = 'rechazado'
+        sesion.commit()
+        texto = 'Este pago ya fue ' + pago_rechazado.estado + ' por el tesorero. Puedes revisar cuantas carreras tienes pagadas con el comando de /misaldo'
+        await context.bot.send_message(
+            pago_rechazado.usuario.telegram_id, 
+            text=texto,
+            reply_to_message_id=pago_validado.mensaje
+        )
         await update.message.reply_text(
                 'Pago rechazado ¿quieres procesar otro pago?', 
                 reply_markup=ReplyKeyboardMarkup(
@@ -575,18 +589,6 @@ async def finpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     with Session() as sesion:
         pagos_pendientes_por_revisar = len(sesion.query(Pago).filter(Pago.estado == 'guardado').all() )
         pagos_pendientes_por_validar = len(sesion.query(Pago).filter(Pago.estado == 'revision').all() )
-        pagos_por_enviar = sesion.query(Pago).filter((Pago.estado == 'confirmado') & (Pago.enviado == False)).all()
-        if len(pagos_por_enviar) > 0:
-            for pago in pagos_por_enviar:
-                usuario = sesion.get(Usuario, pago.usuario_id)
-                texto = 'Este pago ya fue ' + pago.estado + ' por el tesorero. Puedes revisar cuantas carreras tienes pagadas con el comando de /misaldo'
-                await context.bot.send_message(
-                    usuario.telegram_id, 
-                    text=texto,
-                    reply_to_message_id=pago.mensaje
-                )                
-                pago.enviado = True
-            sesion.commit()
     pagos_procesados = str(context.user_data['procesados'])
     await update.message.reply_text(
         'Revisaste o validaste ' + pagos_procesados + ' pagos, quedan pendientes ' + str(pagos_pendientes_por_revisar) + ' por revisar y ' + str(pagos_pendientes_por_validar) + ' por validar. Puedes volver a validar con /revisarpagos', 
