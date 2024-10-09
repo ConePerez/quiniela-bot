@@ -249,7 +249,7 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         tablapagostamano = dibujo.multiline_textbbox([0,0],str(tablapagos),font=letra)
         im = im.resize((tablapagostamano[2] + 20, tablapagostamano[3] + 40))
         dibujo = ImageDraw.Draw(im)
-        poner_fondo_gris(dibujo=dibujo, total_filas=len(usuarios), largo_fila=tablapagostamano[2])
+        dibujo = poner_fondo_gris(dibujo=dibujo, total_filas=len(usuarios), largo_fila=tablapagostamano[2])
         dibujo.text((10, 10), str(tablapagos), font=letra, fill="black")
         letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tablapagostamano[3] + 20), "Ronda actual: " + str(total_carreras), font=letraabajo, fill="black")
