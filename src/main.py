@@ -596,41 +596,41 @@ async def quinielas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     carrera = None
     with Session() as sesion:
         carrera = sesion.query(Carrera).filter((Carrera.estado == 'EN-CURSO') | (Carrera.estado == 'IDLE')).first()
-    if carrera:
-        esion_qualy = None
-        for sesion_carrera in carrera.sesioncarreras:
-            if sesion_carrera.codigo == 'q':
-                sesion_qualy = sesion_carrera
-        horario_qualy = sesion_qualy.hora_empiezo
-        ahora = datetime.now()
-        ahora = ahora.astimezone()
-        enmascarar = True
-        mensaje = "Aun no es hora de qualy, aqui esta la lista con los que han puesto quiniela para la carrera: "
-        if(ahora > horario_qualy):
-            enmascarar = False
-            mensaje = "Quinielas para ronda: "
-        im, graficaPilotosPos = await crear_tabla_quinielas(carrera_en_curso=carrera, enmascarada=enmascarar)
-        if graficaPilotosPos == 'No hay carreras archivadas.':
-            await update.message.reply_text(graficaPilotosPos)
+        if carrera:
+            esion_qualy = None
+            for sesion_carrera in carrera.sesioncarreras:
+                if sesion_carrera.codigo == 'q':
+                    sesion_qualy = sesion_carrera
+            horario_qualy = sesion_qualy.hora_empiezo
+            ahora = datetime.now()
+            ahora = ahora.astimezone()
+            enmascarar = True
+            mensaje = "Aun no es hora de qualy, aqui esta la lista con los que han puesto quiniela para la carrera: "
+            if(ahora > horario_qualy):
+                enmascarar = False
+                mensaje = "Quinielas para ronda: "
+            im, graficaPilotosPos = await crear_tabla_quinielas(carrera_en_curso=carrera, enmascarada=enmascarar)
+            if graficaPilotosPos == 'No hay carreras archivadas.':
+                await update.message.reply_text(graficaPilotosPos)
+                return ConversationHandler.END
+            with BytesIO() as tablaquinielaimagen:    
+                im.save(tablaquinielaimagen, "png")
+                tablaquinielaimagen.seek(0)
+                await update.message.reply_photo(tablaquinielaimagen, caption= mensaje + carrera.nombre)
+            if not enmascarar:
+                texto = "Grafica de los pilotos para la carrera de " + carrera.nombre
+                with BytesIO() as graficaPilotosPos_imagen:    
+                    graficaPilotosPos.savefig(graficaPilotosPos_imagen)
+                    graficaPilotosPos_imagen.seek(0)
+                    await context.bot.send_photo(
+                        chat_id = update.message.chat.id,
+                        photo=graficaPilotosPos_imagen, 
+                        caption=texto
+                        )
             return ConversationHandler.END
-        with BytesIO() as tablaquinielaimagen:    
-            im.save(tablaquinielaimagen, "png")
-            tablaquinielaimagen.seek(0)
-            await update.message.reply_photo(tablaquinielaimagen, caption= mensaje + carrera.nombre)
-        if not enmascarar:
-            texto = "Grafica de los pilotos para la carrera de " + carrera.nombre
-            with BytesIO() as graficaPilotosPos_imagen:    
-                graficaPilotosPos.savefig(graficaPilotosPos_imagen)
-                graficaPilotosPos_imagen.seek(0)
-                await context.bot.send_photo(
-                    chat_id = update.message.chat.id,
-                    photo=graficaPilotosPos_imagen, 
-                    caption=texto
-                    )
-        return ConversationHandler.END
-    await update.message.reply_text(
-        'Aun no pasa un dia despues de la ultima carrera, no hay quinielas por mostrar.'
-        )
+        await update.message.reply_text(
+            'Aun no pasa un dia despues de la ultima carrera, no hay quinielas por mostrar.'
+            )
     return ConversationHandler.END
 
 async def general(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
