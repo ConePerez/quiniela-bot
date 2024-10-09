@@ -584,6 +584,18 @@ async def finpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     with Session() as sesion:
         pagos_pendientes_por_revisar = len(sesion.query(Pago).filter(Pago.estado == 'guardado').all() )
         pagos_pendientes_por_validar = len(sesion.query(Pago).filter(Pago.estado == 'revision').all() )
+        pagos_por_enviar = sesion.query(Pago).filter((Pago.estado == 'confirmado') & (Pago.enviado == False)).all()
+        if len(pagos_por_enviar) > 0:
+            for pago in pagos_por_enviar:
+                usuario = sesion.get(Usuario, pago.usuario_id)
+                texto = 'Este pago ya fue ' + pago.estado + ' por el tesorero. Puedes revisar cuantas carreras tienes pagadas con el comando de /misaldo'
+                await context.bot.send_message(
+                    usuario.telegram_id, 
+                    text=texto,
+                    reply_to_message_id=pago.mensaje
+                )                
+                pago.enviado = True
+            sesion.commit()
     pagos_procesados = str(context.user_data['procesados'])
     await update.message.reply_text(
         'Revisaste o validaste ' + pagos_procesados + ' pagos, quedan pendientes ' + str(pagos_pendientes_por_revisar) + ' por revisar y ' + str(pagos_pendientes_por_validar) + ' por validar. Puedes volver a validar con /revisarpagos', 
@@ -1185,5 +1197,5 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                             sesion.commit()
     return
 
-fila_trabajos.run_repeating(enviar_pagos, interval=600)
+# fila_trabajos.run_repeating(enviar_pagos, interval=600)
 fila_trabajos.run_repeating(actualizar_tablas, interval=600)
