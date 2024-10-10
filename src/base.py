@@ -16,6 +16,6 @@ connection_string = URL.create(
     database='quinielaF1',
 )
 
-engine = create_engine(connection_string)
+engine = create_engine(connection_string, pool_pre_ping=True)
 Session = sessionmaker(bind=engine, expire_on_commit=False)
 # Base = declarative_base()
