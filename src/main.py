@@ -1080,8 +1080,8 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
         hora_actual = datetime.now()
         hora_actual = hora_actual.astimezone()
         encurso_siguiente_Carrera = None
-        sql_comando = select(Usuario).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO'))
-        encurso_siguiente_Carrera = sesion.execute(sql_comando).all()
+        # sql_comando = select(Usuario).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO'))
+        encurso_siguiente_Carrera = sesion.query(Usuario).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO'))
         if not encurso_siguiente_Carrera:
             response = requests.get(url=urlevent_tracker, headers=headerapi)
             response.encoding = 'utf-8-sig'
