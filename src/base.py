@@ -17,5 +17,6 @@ connection_string = URL.create(
 )
 
 engine = create_engine(connection_string, pool_pre_ping=True)
-Session = sessionmaker(bind=engine, expire_on_commit=False)
+# Session = sessionmaker(bind=engine, expire_on_commit=False)
+Session = sessionmaker(bind=engine)
 # Base = declarative_base()
