@@ -4,7 +4,7 @@ import logging
 import pytz
 from PIL import Image, ImageDraw, ImageFont
 from prettytable import PrettyTable
-from datetime import datetime
+from datetime import datetime, timedelta
 from operator import itemgetter
 from io import BytesIO
 from telegram import __version__ as TG_VER
@@ -1088,6 +1088,8 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
             response_dict = response.json()
             carrera_codigo_eventtracker = sesion.query(Carrera).filter(Carrera.codigo == response_dict['fomRaceId']).first()
             rondas_archivadas = len(sesion.query(Carrera).filter(or_(Carrera.estado == "ARCHIVADA", Carrera.estado == 'CANCELADA')).all())
+            hora_qualy = None
+            hora_termino_carrera = None
             if not carrera_codigo_eventtracker:
                 es_valida = True
                 carrera_codigo = response_dict['fomRaceId']
@@ -1097,6 +1099,7 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                 carrera_empiezo = carrera_empiezo.replace('Z', '+00:00')
                 carrera_termino = response_dict['race']['meetingEndDate']
                 carrera_termino = carrera_termino.replace('Z','+00:00')
+                hora_termino_carrera = datetime.fromisoformat(carrera_termino)
                 nueva_carrera = Carrera(codigo=carrera_codigo, nombre=carrera_nombre, hora_empiezo=carrera_empiezo, hora_termino=carrera_termino, estado=carrera_estado, url='', ronda=rondas_archivadas+1)
                 sesion.add(nueva_carrera)
                 sesion.flush()
@@ -1108,9 +1111,13 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                         es_valida = False
                     nuevas_sesiones.append( SesionCarrera(codigo=session_row['session'], carrera_id=nueva_carrera.id, estado=session_row['state'], 
                                                     hora_empiezo=session_row['startTime']+session_row['gmtOffset'], hora_termino=session_row['endTime']+session_row['gmtOffset']))
+                    if session_row['session'] == 'q':
+                        hora_qualy = datetime.fromisoformat(session_row['startTime']+session_row['gmtOffset'])
                 if es_valida:
                     sesion.add_all(nuevas_sesiones)
                     sesion.commit()
+                    fila_trabajos.run_once( callback=actualizar_tablas, when=hora_qualy)
+                    fila_trabajos.run_repeating(callback=actualizar_tablas, interval=300, first=hora_termino_carrera, last=timedelta(hours=2))
         else:
             if encurso_siguiente_Carrera.estado == 'IDLE':
                 if hora_actual > encurso_siguiente_Carrera.hora_empiezo:
