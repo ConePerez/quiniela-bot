@@ -1116,8 +1116,10 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                 if es_valida:
                     sesion.add_all(nuevas_sesiones)
                     sesion.commit()
-                    fila_trabajos.run_once( callback=actualizar_tablas, when=hora_qualy)
-                    fila_trabajos.run_repeating(callback=actualizar_tablas, interval=300, first=hora_termino_carrera, last=hora_termino_carrera + timedelta(hours=2))
+                    orden_trabajo_qualy = fila_trabajos.run_once( callback=actualizar_tablas, when=hora_qualy)
+                    orden_trabajo_carrera = fila_trabajos.run_repeating(callback=actualizar_tablas, interval=300, first=hora_termino_carrera, last=hora_termino_carrera + timedelta(hours=2))
+                    logger.info('qualy: ' + str(orden_trabajo_qualy.next_t))
+                    logger.info('carrera: ' + str(orden_trabajo_carrera.next_t))
         else:
             if encurso_siguiente_Carrera.estado == 'IDLE':
                 if hora_actual > encurso_siguiente_Carrera.hora_empiezo:
