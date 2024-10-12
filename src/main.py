@@ -1200,4 +1200,4 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
     return
 
 # fila_trabajos.run_repeating(enviar_pagos, interval=600)
-fila_trabajos.run_repeating(actualizar_tablas, interval=3600)
+fila_trabajos.run_repeating(actualizar_tablas, interval=300)
