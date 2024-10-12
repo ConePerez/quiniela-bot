@@ -1120,6 +1120,7 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                     orden_trabajo_carrera = fila_trabajos.run_repeating(callback=actualizar_tablas, interval=300, first=hora_termino_carrera, last=hora_termino_carrera + timedelta(hours=2))
                     logger.info('qualy: ' + str(orden_trabajo_qualy.next_t))
                     logger.info('carrera: ' + str(orden_trabajo_carrera.next_t))
+                    logger.info('carrera fin: ' + str(hora_termino_carrera + timedelta(hours=2)))
         else:
             if encurso_siguiente_Carrera.estado == 'IDLE':
                 if hora_actual > encurso_siguiente_Carrera.hora_empiezo:
