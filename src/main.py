@@ -4,7 +4,7 @@ import logging
 import pytz
 from PIL import Image, ImageDraw, ImageFont
 from prettytable import PrettyTable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from operator import itemgetter
 from io import BytesIO
 from telegram import __version__ as TG_VER
@@ -1203,4 +1203,6 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
     return
 
 # fila_trabajos.run_repeating(enviar_pagos, interval=600)
-fila_trabajos.run_repeating(actualizar_tablas, interval=300)
+HORA_ACTUALIZAR = time(hour=14, minute=0, second=0)
+# fila_trabajos.run_repeating(actualizar_tablas, interval=300)
+fila_trabajos.run_daily(callback=actualizar_tablas, time=HORA_ACTUALIZAR, days=(1,2,3))
