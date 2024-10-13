@@ -83,8 +83,8 @@ siguiente_carrera = ''
 dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre','dicembre']
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-tesorero = '5895888783'
-TELEGRAM_GROUP = -4542082656
+tesorero = '6165397411'
+TELEGRAM_GROUP = -1001956166965
 # create all tabless
 Base.metadata.create_all(engine)
 
