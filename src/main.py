@@ -1205,4 +1205,4 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
 # fila_trabajos.run_repeating(enviar_pagos, interval=600)
 HORA_ACTUALIZAR = time(hour=14, minute=0, second=0)
 # fila_trabajos.run_repeating(actualizar_tablas, interval=300)
-fila_trabajos.run_daily(callback=actualizar_tablas, time=HORA_ACTUALIZAR, days=(1,2,3))
+fila_trabajos.run_daily(callback=actualizar_tablas, time=HORA_ACTUALIZAR, days=(0,1,2,3))
