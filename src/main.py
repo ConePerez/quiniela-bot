@@ -570,7 +570,7 @@ async def pagorechazado(update:Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await context.bot.send_message(
             pago_rechazado.usuario.telegram_id, 
             text=texto,
-            reply_to_message_id=pago_validado.mensaje
+            reply_to_message_id=pago_rechazado.mensaje
         )
         await update.message.reply_text(
                 'Pago rechazado ¿quieres procesar otro pago?', 
