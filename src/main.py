@@ -1125,7 +1125,7 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
             if encurso_siguiente_Carrera.estado == 'IDLE':
                 if hora_actual > encurso_siguiente_Carrera.hora_empiezo:
                     encurso_siguiente_Carrera.estado = "EN-CURSO"
-                    sesion.data.commit()
+                    sesion.commit()
             else:
                 sesion_qualy = None
                 for sesion_carrera in encurso_siguiente_Carrera.sesioncarreras:
