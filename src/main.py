@@ -1085,7 +1085,7 @@ async def mandar_resultados(context: ContextTypes.DEFAULT_TYPE):
             links = []
             if('links' in response_dict):
                 links = response_dict['links']
-                if DEBUG_MODE == 'ON'
+                if DEBUG_MODE == 'ON':
                     links = [{"text":"RESULTS", "url":"https://www.formula1.com/en/results/2024/races/1246/singapore/race-result"}]                                
                 url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
                 if(not(url_results_index is None)):
