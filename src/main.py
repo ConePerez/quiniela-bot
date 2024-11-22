@@ -112,7 +112,7 @@ fila_trabajos = ptb.job_queue
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # await ptb.bot.setWebhook(WEBHOOK_URL) # replace <your-webhook-url>
+    await ptb.bot.setWebhook(WEBHOOK_URL) # replace <your-webhook-url>
     await ptb.bot.set_my_commands(
         [
             BotCommand("start", "empezar el bot"),
@@ -257,7 +257,7 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         with BytesIO() as tablapagos_imagen:    
             im.save(tablapagos_imagen, "png")
             tablapagos_imagen.seek(0)
-            await update.message.reply_photo(tablapagos_imagen, caption='Tabla de pagos al momento, asegurate de tener ' + str(total_carreras + 1) + ' carreras pagadas para poder entrar sin penalizacion a la /proxima carrera.')
+            await update.message.reply_photo(tablapagos_imagen, caption='Tabla de pagos al momento, asegurate de tener ' + str(len(carreras) + 1) + ' carreras pagadas para poder entrar sin penalizacion a la /proxima carrera.')
     
     return ConversationHandler.END
 

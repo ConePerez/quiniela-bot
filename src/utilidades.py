@@ -91,13 +91,13 @@ def crear_tabla_puntos(sesion, carrera:Carrera):
         tabla_puntos_piloto.add_row([puntos_piloto.posicion, puntos_piloto.piloto.nombre + ' ' + puntos_piloto.piloto.apellido, puntos_piloto.piloto.equipo, puntos_piloto.puntos, puntos_piloto.intervalo])
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
-    letra = ImageFont.truetype("./src/Menlo.ttc", 15)
+    letra = ImageFont.truetype("Menlo.ttc", 15)
     tablapilotostamano = dibujo.multiline_textbbox([0,0],str(tabla_puntos_piloto),font=letra)
     im = im.resize((tablapilotostamano[2] + 20, tablapilotostamano[3] + 40))
     dibujo = ImageDraw.Draw(im)
     dibujo = poner_fondo_gris(dibujo, len(resultado_pilotos), tablapilotostamano[2])
     dibujo.text((10, 10), str(tabla_puntos_piloto), font=letra, fill="black")
-    letraabajo = ImageFont.truetype("./src/Menlo.ttc", 10)
+    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablapilotostamano[3] + 20), "Resultados tomados de la pagina oficial de Formula 1", font=letraabajo, fill="black")
     return im
 
@@ -196,13 +196,13 @@ def crear_tabla_general(sesion):
                 penalizaciones = penalizaciones + resultado.penalizaciones
             tablaresultados.add_row([usuario.obtener_nombre_completo(), normales + extras + penalizaciones, normales, extras, penalizaciones])   
         dibujo = ImageDraw.Draw(im)
-        letra = ImageFont.truetype("./src/Menlo.ttc", 15)
+        letra = ImageFont.truetype("Menlo.ttc", 15)
         tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
         im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
         dibujo = ImageDraw.Draw(im)
         dibujo = poner_fondo_gris(dibujo, len(usuarios), tablaresultados_tamano[2])
         dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
-        letraabajo = ImageFont.truetype("./src/Menlo.ttc", 10)
+        letraabajo = ImageFont.truetype("Menlo.ttc", 10)
         dibujo.text((20, tablaresultados_tamano[3] + 20), "Total de rondas incluidas: " + str(total_rondas), font=letraabajo, fill="black")
     return im, total_rondas
 
@@ -250,13 +250,13 @@ def crear_tabla_resultados(sesion, carrera:Carrera|None):
         texto_ganador = 'No hubo ganador para la carrera: ' + carrera.nombre + '. Nadie logro hacer 90 puntos o mas. El premio se acumula para la /proxima carrera.'
     im = Image.new("RGB", (200, 200), "white")
     dibujo = ImageDraw.Draw(im)
-    letra = ImageFont.truetype("./src/Menlo.ttc", 15)
+    letra = ImageFont.truetype("Menlo.ttc", 15)
     tablaresultados_tamano = dibujo.multiline_textbbox([0,0],str(tablaresultados),font=letra)
     im = im.resize((tablaresultados_tamano[2] + 20, tablaresultados_tamano[3] + 40))
     dibujo = ImageDraw.Draw(im)
     dibujo = poner_fondo_gris(dibujo, len(carrera.resultados), tablaresultados_tamano[2])
     dibujo.text((10, 10), str(tablaresultados), font=letra, fill="black")
-    letraabajo = ImageFont.truetype("./src/Menlo.ttc", 10)
+    letraabajo = ImageFont.truetype("Menlo.ttc", 10)
     dibujo.text((20, tablaresultados_tamano[3] + 20), "Los que tienen penalizaciones no pueden ganar el premio, estan en la segunda seccion de la tabla", font=letraabajo, fill="black")
     return im, texto_ganador
 
