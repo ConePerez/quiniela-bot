@@ -112,7 +112,7 @@ fila_trabajos = ptb.job_queue
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await ptb.bot.setWebhook(WEBHOOK_URL) # replace <your-webhook-url>
+    # await ptb.bot.setWebhook(WEBHOOK_URL) # replace <your-webhook-url>
     await ptb.bot.set_my_commands(
         [
             BotCommand("start", "empezar el bot"),
