@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 from models import Usuario, Quiniela, Resultado, Pago, Piloto, PuntosPilotosCarrrera, Carrera, SesionCarrera, Base
 from base import engine, Session
 from sqlalchemy import or_, select
+from pyngrok import ngrok
+from bs4 import BeautifulSoup
 
 from contextlib import asynccontextmanager
 from http import HTTPStatus
@@ -66,25 +68,33 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("TOKEN")
 WEBHOOK_URL = "https://parental-giulietta-conesoft-b7c0edc7.koyeb.app/"
+
+DEBUG_MODE = os.environ.get("DEBUG_MODE")
+
+if DEBUG_MODE == 'ON':
+    PORT = 8000
+    NGROK_TOKEN = os.environ.get("NGROK_TOKEN")
+    ngrok.set_auth_token(NGROK_TOKEN)
+    http_tunnel = ngrok.connect(PORT, bind_tls=True)
+    public_url = http_tunnel.public_url
+    HOST_URL = public_url
+    logger.info("The tunnel url is: %s ", public_url)
+    WEBHOOK_URL = public_url
+
 QUINIELA, FAVORITOS, CONFIRMAR_PENALIZACION, SUBIRCOMPROBANTE, GUARDARCOMPROBANTE, PROCESARPAGO, PAGOREVISADO, PAGOCONFIRMADO, SIGUIENTEPAGOREVISAR, SIGUIENTEPAGOCONFIRMAR, FINPAGOS, MENU_AYUDA, GUARDAR_PILOTOS, CONFIRMAR_PILOTOS, P1, P2, P3, P4, P5, P6, P7 = range(21)
 REGLAS = 'reglas'
 AYUDA = 'ayuda'
 ultima_carrera = ''
 siguiente_carrera = ''
-# dbPuntosPilotos = deta.Base('PuntosPilotos')
-# dbCarreras = deta.Base('Carreras')
-# dbfavoritos = deta.Base("Favoritos")
-# dbHistorico = deta.Base('Historico')
-# dbQuiniela = deta.Base("Quiniela")
-# dbPilotos = deta.Base("Pilotos")
-# dbPagos = deta.Base('Pagos')
-# dbConfiguracion= deta.Base('Configuracion')
-# documentos = deta.Drive('Documentos')
 dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre','dicembre']
 MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
 tesorero = '6165397411'
 TELEGRAM_GROUP = -1001956166965
+
+if DEBUG_MODE == 'ON':
+    tesorero = '5895888783'
+    TELEGRAM_GROUP = -4542082656
 # create all tabless
 Base.metadata.create_all(engine)
 
@@ -101,7 +111,7 @@ fila_trabajos = ptb.job_queue
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await ptb.bot.setWebhook("https://parental-giulietta-conesoft-b7c0edc7.koyeb.app/") # replace <your-webhook-url>
+    await ptb.bot.setWebhook(WEBHOOK_URL) # replace <your-webhook-url>
     await ptb.bot.set_my_commands(
         [
             BotCommand("start", "empezar el bot"),
@@ -167,14 +177,6 @@ async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         usuario = Usuario.obtener_usuario_por_telegram_id(telegram_id=telegram_usuario.id, session=sesion)
         pagos_guardados, pagos_confirmados = pagos_usuario(usuario_pagos=usuario.pagos)
         carreras = len(sesion.query(Carrera).all())
-    # pagos_usuario = dbPagos.fetch([{'usuario':usuario, 'estado':'guardado'},{'usuario':usuario, 'estado':'confirmado'}])
-    
-    # carreras = 0
-    # for pago in pagos_usuario.items:
-    #     pagos_guardados += int(pago['carreras'])
-    #     if pago['estado'] == 'confirmado':
-    #         pagos_confirmados += int(pago['carreras'])
-    # carreras = dbCarreras.fetch().count
     texto_mensaje = f'Hasta el momento llevas {pagos_guardados + pagos_confirmados} pagadas ({pagos_confirmados} estan confirmados), para entrar a la /proxima carrera debes tener al menos {carreras} pagadas.'
     await update.message.reply_text(
         texto_mensaje, 
@@ -228,10 +230,7 @@ async def mispuntos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Comando para desplegar la tabla de pagos"""
-    # carreras = dbCarreras.fetch()
-    # total_carreras = str(carreras.count)
     total_carreras = 0
-    # configuracion = dbConfiguracion.get('controles')
     with Session() as sesion:
         carreras = sesion.query(Carrera).filter((Carrera.estado == 'ARCHIVADA') | (Carrera.estado == "CANCELADA")).all()
         total_carreras = str(len(carreras))
@@ -257,13 +256,12 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         with BytesIO() as tablapagos_imagen:    
             im.save(tablapagos_imagen, "png")
             tablapagos_imagen.seek(0)
-            await update.message.reply_photo(tablapagos_imagen, caption='Tabla de pagos al momento, asegurate de tener ' + str(total_carreras) + ' carreras pagadas para poder entrar sin penalizacion a la /proxima carrera.')
+            await update.message.reply_photo(tablapagos_imagen, caption='Tabla de pagos al momento, asegurate de tener ' + str(total_carreras + 1) + ' carreras pagadas para poder entrar sin penalizacion a la /proxima carrera.')
     
     return ConversationHandler.END
 
 async def proxima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Comando para desplegar la informacion de la siguiente carrera"""
-    # proxima_Carrera = dbCarreras.fetch([{'Estado':'IDLE'},{'Estado':'EN-CURSO'}])
     proxima_carrera = None
     sesiones_carrera_quiniela = None
     with Session() as sesion:
@@ -365,7 +363,6 @@ async def guardar_comprobante(update:Update, context: ContextTypes.DEFAULT_TYPE)
         pago.mensaje = mensaje
         pago.texto = mensaje_texto
         sesion.commit()
-    # dbPagos.update(updates={'foto':photo_id, 'estado':'guardado', 'mensaje':mensaje, 'texto':mensaje_texto, 'nombre':usuario}, key=context.user_data["fecha"])
         await update.message.reply_text(
             "Tu pago se ha guardado por " + context.user_data["pago_carreras"] + " carreras" +  ". El tesorero va a revisar la foto del comprobante para confirmarlo",
             reply_markup=ReplyKeyboardRemove()
@@ -415,11 +412,6 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 cuenta_columnas = 0
             keyboard[len(keyboard) - 1].append(str(boton + 1))
             cuenta_columnas = cuenta_columnas + 1
-        # if len(keyboard[len(keyboard) - 1]) < COLUMNAS:
-        #     for i in range(COLUMNAS - len(keyboard[len(keyboard) - 1])):
-        #         keyboard[len(keyboard) - 1].append('')
-
-        
         nuevo_pago = Pago(fecha_hora=ahora, usuario_id=usuario.id, carreras=0, enviado=False, estado='creado', foto='', mensaje='', texto='0')
         sesion.add(nuevo_pago)
         sesion.commit()
@@ -435,15 +427,11 @@ async def mipago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def revisarpagos(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     telegram_usuario = update.message.from_user
-    # pagos_guardados = dbPagos.fetch({'estado':'guardado'})
-    # pagos_en_revision = dbPagos.fetch({'estado':'revision'})
     pagos_guardados = 0
     pagos_en_revision = 0
     with Session() as sesion:
         pagos_guardados = len(sesion.query(Pago).filter(Pago.estado == 'guardado').all() )
         pagos_en_revision = len(sesion.query(Pago).filter(Pago.estado == 'revision').all() )
-    # pagos_por_revisar = str(pagos_guardados.count)
-    # pagos_por_confirmar = str(pagos_en_revision.count)
     context.user_data['procesados'] = 0
     if pagos_guardados == 0 and pagos_en_revision == 0:
         await update.message.reply_text(
@@ -475,10 +463,8 @@ async def revisarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             )
         return ConversationHandler.END
     else:
-        # pago_revisar = pagos_guardados[0]
         numero_carreras = pago_revisar.carreras
         texto = pago_revisar.texto
-        # usuario = pago_revisar.nombre
         context.user_data["pago"] = pago_revisar.id
         await update.message.reply_photo(
             pago_revisar.foto, 
@@ -491,7 +477,6 @@ async def revisarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return PAGOREVISADO
 
 async def confirmarpago(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # pagos_guardados = dbPagos.fetch({'estado':'revision'})
     pago_confirmar = None
     usuario = None
     with Session() as sesion:
@@ -674,9 +659,6 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         carrera_quiniela =  sesion.query(Carrera).filter(or_(Carrera.estado == 'IDLE', Carrera.estado == 'EN-CURSO')).first()
         if carrera_quiniela:
             sesiones_carrera_quiniela = carrera_quiniela.sesioncarreras    
-    # puntospilotos = dbPuntosPilotos.fetch()
-    # pilotoslista = dbPilotos.get('2024')['Lista']
-    # carrera_quiniela = dbCarreras.fetch([{'Estado':'IDLE'}, {'Estado':'EN-CURSO'}])
     if not carrera_quiniela:
         await update.message.reply_text(
                 'Aun no tengo los datos para la siguiente carrera, espera un dia despues que termino la ultima carrera, para mandar la quiniela de la proxima.'
@@ -694,11 +676,6 @@ async def inicio_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'Ya no se puede modificar o ingresar una quiniela porque la qualy ya empezo. Si no metiste quiniela, se te penalizara con base a las reglas. Usa /help para ver las reglas.'
             )
         return ConversationHandler.END
-    # for carrera in puntospilotos.items:
-    #     for piloto in carrera['Pilotos']:
-    #         pilotoslista[piloto]['AcumuladoPuntos'] = pilotoslista[piloto]['AcumuladoPuntos'] + carrera['Pilotos'][piloto]['puntos']
-    # pilotoslista = sorted(pilotoslista.items(), key=lambda item: item[1]['AcumuladoPuntos'], reverse=True)
-    # context.user_data['ListaPilotosOrdenada'] = pilotoslista
     pilotos.sort(key=lambda x: x.codigo, reverse=True)
     COLUMNAS = 5
     keyboard = []
@@ -1071,7 +1048,98 @@ async def enviar_pagos(context: ContextTypes.DEFAULT_TYPE):
             sesion.commit()
     return
 
-async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
+async def mandar_quinielas(context: ContextTypes.DEFAULT_TYPE):
+    with Session() as sesion:
+        encurso_siguiente_Carrera = sesion.query(Carrera).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO')).first()
+        archivar_quinielas_participante(sesion=sesion, carrera=encurso_siguiente_Carrera)
+        im, graficaPilotos = crear_tabla_quinielas(encurso_siguiente_Carrera, False)
+        texto = "Quinielas para la carrera" + encurso_siguiente_Carrera.nombre
+        with BytesIO() as tablaquinielaimagen:
+            im.save(tablaquinielaimagen, "png")
+            tablaquinielaimagen.seek(0)
+            await context.bot.send_photo(
+                chat_id= TELEGRAM_GROUP,
+                photo=tablaquinielaimagen,
+                caption =texto,
+            )
+        texto = 'Grafica de los pilotos para la carrera de ' + encurso_siguiente_Carrera.nombre
+        with BytesIO() as graficaPilotos_imagen:
+            graficaPilotos.savefig(graficaPilotos_imagen)
+            graficaPilotos_imagen.seek(0)
+            await context.bot.send_photo(
+                chat_id=TELEGRAM_GROUP,
+                photo=graficaPilotos_imagen,
+                caption=texto
+            )
+
+async def mandar_resultados(context: ContextTypes.DEFAULT_TYPE):
+    with Session() as sesion:
+        with requests.Session() as s:
+            F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
+            urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
+            headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
+            encurso_siguiente_Carrera = sesion.query(Carrera).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO')).first()
+            response = s.get(url=urlevent_tracker, headers=headerapi)
+            response.encoding = 'utf-8-sig'
+            response_dict = response.json()
+            links = []
+            if('links' in response_dict):
+                links = response_dict['links']
+                if DEBUG_MODE == 'ON'
+                    links = [{"text":"RESULTS", "url":"https://www.formula1.com/en/results/2024/races/1246/singapore/race-result"}]                                
+                url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
+                if(not(url_results_index is None)):
+                    url_results = links[url_results_index]['url'] 
+                    logger.info('url: ' + url_results)
+                    response = s.get(url_results)
+                    if DEBUG_MODE == 'ON':
+                        response = s.get("https://www.formula1.com/en/results/2024/races/1246/singapore/race-result")
+                    soup = BeautifulSoup(response.content, features="html.parser")                     
+                    posiciones_dict, pilotos_con_puntos = obtener_resultados(sesion, encurso_siguiente_Carrera, soup)
+                    if pilotos_con_puntos >= 10:
+                        archivar_puntos_participante(sesion, encurso_siguiente_Carrera, posiciones_dict)
+                        im, texto = crear_tabla_resultados(sesion, encurso_siguiente_Carrera)
+                        with BytesIO() as tablaresutados_imagen:    
+                            im.save(tablaresutados_imagen, "png")
+                            tablaresutados_imagen.seek(0)
+                            await context.bot.send_photo(
+                                chat_id= TELEGRAM_GROUP,
+                                photo=tablaresutados_imagen, 
+                                caption=texto
+                                )
+                        im = crear_tabla_puntos(sesion, encurso_siguiente_Carrera)
+                        texto = 'Resultados de la carrera: ' + encurso_siguiente_Carrera.nombre
+                        with BytesIO() as tabla_puntos_imagen:    
+                            im.save(tabla_puntos_imagen, "png")
+                            tabla_puntos_imagen.seek(0)
+                            await context.bot.send_photo(
+                                chat_id= TELEGRAM_GROUP,
+                                photo=tabla_puntos_imagen, 
+                                caption=texto
+                                )
+                        im, total_rondas = crear_tabla_general(sesion=sesion)
+                        texto = "Total de rondas incluidas: " + str(total_rondas)
+                        with BytesIO() as tablageneral_imagen:    
+                            im.save(tablageneral_imagen, "png")
+                            tablageneral_imagen.seek(0)
+                            await context.bot.send_photo(
+                                chat_id= TELEGRAM_GROUP,
+                                photo=tablageneral_imagen, 
+                                caption=texto
+                                )
+                        encurso_siguiente_Carrera.estado = 'ARCHIVADA'
+                        sesion.flush()
+                        trabajo_qualy = fila_trabajos.get_jobs_by_name("mandar_quinielas")
+                        if trabajo_qualy:
+                            for trabajo in trabajo_qualy:
+                                trabajo.schedule_removal()
+                        trabajo_carrera = fila_trabajos.get_jobs_by_name("mandar_resultados")
+                        if trabajo_carrera:
+                            for trabajo in trabajo_carrera:
+                                trabajo.schedule_removal()
+                    sesion.commit()
+
+async def agregar_nueva_carrera(context: ContextTypes.DEFAULT_TYPE):
     with Session() as sesion:
         F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
         urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
@@ -1080,7 +1148,6 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
         hora_actual = datetime.now()
         hora_actual = hora_actual.astimezone()
         encurso_siguiente_Carrera = None
-        # sql_comando = select(Usuario).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO'))
         encurso_siguiente_Carrera = sesion.query(Carrera).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO')).first()
         if not encurso_siguiente_Carrera:
             response = requests.get(url=urlevent_tracker, headers=headerapi)
@@ -1116,93 +1183,34 @@ async def actualizar_tablas(context: ContextTypes.DEFAULT_TYPE):
                 if es_valida:
                     sesion.add_all(nuevas_sesiones)
                     sesion.commit()
-                    orden_trabajo_qualy = fila_trabajos.run_once( callback=actualizar_tablas, when=hora_qualy)
-                    orden_trabajo_carrera = fila_trabajos.run_repeating(callback=actualizar_tablas, interval=300, first=hora_termino_carrera, last=hora_termino_carrera + timedelta(hours=2))
+                    orden_trabajo_qualy = fila_trabajos.run_once( callback=mandar_quinielas, when=hora_qualy, name="mandar_quinielas")
+                    orden_trabajo_carrera = fila_trabajos.run_repeating(callback=mandar_resultados, interval=300, first=hora_termino_carrera, last=hora_termino_carrera + timedelta(hours=2), name="mandar_resultados")
                     logger.info('qualy: ' + str(orden_trabajo_qualy.next_t))
                     logger.info('carrera: ' + str(orden_trabajo_carrera.next_t))
                     logger.info('carrera fin: ' + str(hora_termino_carrera + timedelta(hours=2)))
-        else:
-            if encurso_siguiente_Carrera.estado == 'IDLE':
-                if hora_actual > encurso_siguiente_Carrera.hora_empiezo:
-                    encurso_siguiente_Carrera.estado = "EN-CURSO"
-                    sesion.commit()
-            else:
-                sesion_qualy = None
-                for sesion_carrera in encurso_siguiente_Carrera.sesioncarreras:
-                    if sesion_carrera.codigo == 'q':
-                        sesion_qualy = sesion_carrera
-                if hora_actual >= sesion_qualy.hora_empiezo and sesion_qualy.estado == 'upcoming':
-                    archivar_quinielas_participante(sesion=sesion, carrera=encurso_siguiente_Carrera)
-                    im, graficaPilotos = crear_tabla_quinielas(encurso_siguiente_Carrera, False)
-                    texto = "Quinielas para la carrera" + encurso_siguiente_Carrera.nombre
-                    with BytesIO() as tablaquinielaimagen:
-                        im.save(tablaquinielaimagen, "png")
-                        tablaquinielaimagen.seek(0)
-                        await context.bot.send_photo(
-                            chat_id= TELEGRAM_GROUP,
-                            photo=tablaquinielaimagen,
-                            caption =texto,
-                        )
-                    texto = 'Grafica de los pilotos para la carrera de ' + encurso_siguiente_Carrera.nombre
-                    with BytesIO() as graficaPilotos_imagen:
-                        graficaPilotos.savefig(graficaPilotos_imagen)
-                        graficaPilotos_imagen.seek(0)
-                        await context.bot.send_photo(
-                            chat_id=TELEGRAM_GROUP,
-                            photo=graficaPilotos_imagen,
-                            caption=texto
-                        )
-                    sesion_qualy.estado = 'EMPEZADA'
-                    sesion.commit()
-                if hora_actual > encurso_siguiente_Carrera.hora_termino:
-                    response = requests.get(url=urlevent_tracker, headers=headerapi)
-                    response.encoding = 'utf-8-sig'
-                    response_dict = response.json()
-                    links = []
-                    if('links' in response_dict):
-                        links = response_dict['links']                                
-                        url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
-                        if(not(url_results_index is None)):
-                            url_results = links[url_results_index]['url']                        
-                            posiciones_dict, pilotos_con_puntos = obtener_resultados(sesion, url_results, encurso_siguiente_Carrera)
-                            if pilotos_con_puntos >= 10:
-                                archivar_puntos_participante(sesion, encurso_siguiente_Carrera, posiciones_dict)
-                                im, texto = crear_tabla_resultados(sesion, encurso_siguiente_Carrera)
-                                with BytesIO() as tablaresutados_imagen:    
-                                    im.save(tablaresutados_imagen, "png")
-                                    tablaresutados_imagen.seek(0)
-                                    await context.bot.send_photo(
-                                        chat_id= TELEGRAM_GROUP,
-                                        photo=tablaresutados_imagen, 
-                                        caption=texto
-                                        )
-                                im = crear_tabla_puntos(sesion, encurso_siguiente_Carrera)
-                                texto = 'Resultados de la carrera: ' + encurso_siguiente_Carrera.nombre
-                                with BytesIO() as tabla_puntos_imagen:    
-                                    im.save(tabla_puntos_imagen, "png")
-                                    tabla_puntos_imagen.seek(0)
-                                    await context.bot.send_photo(
-                                        chat_id= TELEGRAM_GROUP,
-                                        photo=tabla_puntos_imagen, 
-                                        caption=texto
-                                        )
-                                im, total_rondas = crear_tabla_general()
-                                texto = "Total de rondas incluidas: " + str(total_rondas)
-                                with BytesIO() as tablageneral_imagen:    
-                                    im.save(tablageneral_imagen, "png")
-                                    tablageneral_imagen.seek(0)
-                                    await context.bot.send_photo(
-                                        chat_id= TELEGRAM_GROUP,
-                                        photo=tablageneral_imagen, 
-                                        caption=texto
-                                        )
-                                encurso_siguiente_Carrera.estado = 'ARCHIVADA'
-                                sesion.flush()
-                            sesion.commit()
-        sesion.close()
-    return
+
+async def agregar_qualy_carrera(context: ContextTypes.DEFAULT_TYPE):
+    with Session() as sesion:
+        encurso_siguiente_Carrera = sesion.query(Carrera).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO')).first()
+        if encurso_siguiente_Carrera:
+            sesion_qualy = None
+            for sesion_carrera in encurso_siguiente_Carrera.sesioncarreras:
+                if sesion_carrera.codigo == 'q':
+                    sesion_qualy = sesion_carrera
+            trabajos = fila_trabajos.jobs()
+            if len(trabajos) <= 2:
+                orden_trabajo_qualy = fila_trabajos.run_once( callback=mandar_quinielas, when=sesion_qualy.hora_empiezo, name="mandar_quinielas")
+                orden_trabajo_carrera = fila_trabajos.run_repeating(callback=mandar_resultados, interval=300, first=encurso_siguiente_Carrera.hora_termino, last=encurso_siguiente_Carrera.hora_termino + timedelta(hours=2), name="mandar_resultados")
+                logger.info('qualy: ' + str(orden_trabajo_qualy.next_t))
+                logger.info('carrera: ' + str(orden_trabajo_carrera.next_t))
 
 # fila_trabajos.run_repeating(enviar_pagos, interval=600)
 HORA_ACTUALIZAR = time(hour=14, minute=0, second=0)
+if DEBUG_MODE == 'ON':
+    HORA_ACTUALIZAR = time(hour=4, minute=43, second=0)
+
 # fila_trabajos.run_repeating(actualizar_tablas, interval=300)
-fila_trabajos.run_daily(callback=actualizar_tablas, time=HORA_ACTUALIZAR, days=(0,1,2,3))
+hora_actual = datetime.now()
+hora_actual = hora_actual.astimezone()
+fila_trabajos.run_daily(callback=agregar_nueva_carrera, time=HORA_ACTUALIZAR, days=(1,2,3), name="AgregarNuevaCarrera")
+fila_trabajos.run_repeating(callback=agregar_qualy_carrera, first=hora_actual, last=hora_actual + timedelta(minutes=1.5), interval=60, name="AgregarQualyCarrera")
