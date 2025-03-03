@@ -1076,7 +1076,7 @@ async def mandar_quinielas(context: ContextTypes.DEFAULT_TYPE):
 async def mandar_resultados(context: ContextTypes.DEFAULT_TYPE):
     with Session() as sesion:
         with requests.Session() as s:
-            F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
+            F1_API_KEY = 'fCUCjWrKPu9ylJwRAv8BpGLEgiAuThx7'
             urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
             headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
             encurso_siguiente_Carrera = sesion.query(Carrera).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO')).first()
@@ -1142,7 +1142,7 @@ async def mandar_resultados(context: ContextTypes.DEFAULT_TYPE):
 
 async def agregar_nueva_carrera(context: ContextTypes.DEFAULT_TYPE):
     with Session() as sesion:
-        F1_API_KEY = 'qPgPPRJyGCIPxFT3el4MF7thXHyJCzAP'
+        F1_API_KEY = 'fCUCjWrKPu9ylJwRAv8BpGLEgiAuThx7'
         urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
         headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
         urllivetiming = 'https://livetiming.formula1.com/static/'
