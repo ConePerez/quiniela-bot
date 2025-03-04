@@ -978,12 +978,7 @@ async def guardar_pilotos(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # register handlers
 
-filtropilotos = 'NADA|ATRAS'
-with Session() as sesion:
-    pilotos = sesion.query(Piloto).all()
-    for piloto in pilotos:
-        filtropilotos = filtropilotos + "|" + piloto.codigo
-filtropilotos = '^(' + filtropilotos + ')$'
+filtropilotos = '^(NADA|ATRAS|[A-Z]{3})$'
 logger.info(filtropilotos)
 conv_teclado = ConversationHandler(
     entry_points=[
