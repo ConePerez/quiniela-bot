@@ -347,4 +347,5 @@ def pagos_usuario(usuario_pagos):
             pagos_guardados += pago.carreras
         if pago.estado == 'confirmado':
             pagos_confirmados += pago.carreras
+            pagos_guardados += pago.carreras
     return pagos_guardados, pagos_confirmados
