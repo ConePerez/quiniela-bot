@@ -178,7 +178,7 @@ async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         usuario = Usuario.obtener_usuario_por_telegram_id(telegram_id=telegram_usuario.id, session=sesion)
         pagos_guardados, pagos_confirmados = pagos_usuario(usuario_pagos=usuario.pagos)
         carreras = len(sesion.query(Carrera).all())
-    texto_mensaje = f'Hasta el momento llevas {pagos_guardados} pagadas ({pagos_confirmados} estan confirmados), para entrar a la /proxima carrera debes tener al menos {carreras} pagadas.'
+    texto_mensaje = f'Hasta el momento tienes {pagos_guardados} pagadas ({pagos_confirmados} estan confirmados), para entrar a la /proxima carrera debes tener al menos {carreras} pagadas.'
     await update.message.reply_text(
         texto_mensaje, 
         reply_markup=ReplyKeyboardRemove()
