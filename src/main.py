@@ -167,7 +167,7 @@ async def process_update(request: Request):
 
 @app.get("/test")
 async def test():
-    return "esto es una prueba"
+    return Response(status_code=HTTPStatus.OK)
 
 async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     telegram_usuario = update.message.from_user
