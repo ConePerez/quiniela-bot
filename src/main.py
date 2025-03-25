@@ -165,7 +165,7 @@ async def process_update(request: Request):
     await ptb.process_update(update)
     return Response(status_code=HTTPStatus.OK)
 
-@app.get("/test")
+@app.post("/test")
 async def test():
     return Response(status_code=HTTPStatus.OK)
 
