@@ -1074,18 +1074,18 @@ async def mandar_resultados(context: ContextTypes.DEFAULT_TYPE):
             F1_API_KEY = 'fCUCjWrKPu9ylJwRAv8BpGLEgiAuThx7'
             urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
             headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
+            url_f1 = 'https://www.formula1.com'
             encurso_siguiente_Carrera = sesion.query(Carrera).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO')).first()
             response = s.get(url=urlevent_tracker, headers=headerapi)
             response.encoding = 'utf-8-sig'
             response_dict = response.json()
             links = []
-            if('links' in response_dict):
-                links = response_dict['links']
+            if('sessionResults' in response_dict):
+                links = response_dict['sessionResults']
                 if DEBUG_MODE == 'ON':
                     links = [{"text":"RESULTS", "url":"https://www.formula1.com/en/results/2024/races/1246/singapore/race-result"}]                                
-                url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
-                if(not(url_results_index is None)):
-                    url_results = links[url_results_index]['url'] 
+                if('resultsPageUrl' in links):
+                    url_results = url_f1 + links['resultsPageUrl'] 
                     logger.info('url: ' + url_results)
                     response = s.get(url_results)
                     if DEBUG_MODE == 'ON':
