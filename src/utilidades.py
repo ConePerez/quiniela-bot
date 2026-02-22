@@ -1,13 +1,14 @@
 from PIL import Image, ImageDraw, ImageFont
-from bs4 import BeautifulSoup
-import requests
 from prettytable import PrettyTable
-from datetime import datetime
 import pytz
 from operator import itemgetter
 import numpy as np
 import matplotlib.pyplot as plt
-from models import Usuario, Quiniela, Resultado, Pago, Piloto, PuntosPilotosCarrrera, Carrera, SesionCarrera, Base, HistoricoQuiniela
+from base import INFORMACION_BOTS
+from environment import DEPAGO
+from config import logger
+import requests
+from sqlalchemy import select
 
 
 def poner_fondo_gris(dibujo: ImageDraw.ImageDraw, total_filas: int, largo_fila: int) -> ImageDraw.ImageDraw:
@@ -18,8 +19,10 @@ def poner_fondo_gris(dibujo: ImageDraw.ImageDraw, total_filas: int, largo_fila: 
         y = y + 3.5 + 15 + 3.5 + 14
     return dibujo
 
-def obtener_resultados(sesion, carrera, soup):
+def obtener_resultados(sesion, carrera, soup, bot_nombre):
     # soup = BeautifulSoup(requests.get(url).content, features="html.parser")
+    Piloto = INFORMACION_BOTS[bot_nombre]['tablas']['piloto']
+    PuntosPilotosCarrrera = INFORMACION_BOTS[bot_nombre]['tablas']['puntospilotocarrera']
     table = soup.find('table')
     rows = []
     for i, row in enumerate(table.find_all('tr')):
@@ -30,6 +33,8 @@ def obtener_resultados(sesion, carrera, soup):
     posiciones_dict = {}
     pilotos_con_puntos = 0
     pilotos_top10 = []
+    logger.info(rows)
+    logger.info(carrera)
     for row in rows:
         if(row[0].isnumeric()):
             posicion = int(row[0])
@@ -40,6 +45,7 @@ def obtener_resultados(sesion, carrera, soup):
                     'puntos': int(row[6])
                     }
                 piloto = sesion.query(Piloto).filter(Piloto.numero == int(row[1])).first()
+                logger.info(piloto)
                 pilotos_top10.append(PuntosPilotosCarrrera(carrera_id=carrera.id, piloto_id=piloto.id, posicion=posicion, puntos=int(row[6]), intervalo=row[5]))
                 if int(row[6]) > 0:
                     pilotos_con_puntos = pilotos_con_puntos + 1
@@ -48,7 +54,9 @@ def obtener_resultados(sesion, carrera, soup):
         sesion.flush()
     return posiciones_dict, pilotos_con_puntos
 
-def archivar_quinielas_participante(sesion, carrera):
+def archivar_quinielas_participante(sesion, carrera, bot_nombre):
+    Quiniela = INFORMACION_BOTS[bot_nombre]['tablas']['quiniela']
+    HistoricoQuiniela = INFORMACION_BOTS[bot_nombre]['tablas']['historicoquiniela']
     historicos = []
     quinielas = sesion.query(Quiniela).all()
     for quiniela in quinielas:
@@ -57,22 +65,29 @@ def archivar_quinielas_participante(sesion, carrera):
     sesion.add_all(historicos)
     sesion.commit()
 
-def archivar_puntos_participante(sesion, carrera:Carrera, posiciones_dict):
+def archivar_puntos_participante(sesion, carrera, posiciones_dict, bot_nombre):
+    Piloto = INFORMACION_BOTS[bot_nombre]['tablas']['piloto']
+    Resultado = INFORMACION_BOTS[bot_nombre]['tablas']['resultado']
     restulados_carrera = []
+    pilotos = sesion.query(Piloto).all()
     for historico_quiniela in carrera.historicoquinielas_carrera:
         penalizacion = 0
         normales = 0
         extras = 0
         if carrera.id != historico_quiniela.quiniela_carrera_id:
             penalizacion = penalizacion - 5
-        pagos_guardados, pagos_confirmados = pagos_usuario(historico_quiniela.usuario.pagos)
-        carreras_pagadas =  pagos_confirmados + pagos_guardados
-        if carreras_pagadas < carrera.ronda:
-            penalizacion = penalizacion - 5
+        if INFORMACION_BOTS[bot_nombre]['tipo'] == DEPAGO:
+            pagos_guardados, pagos_confirmados = pagos_usuario(historico_quiniela.usuario.pagos)
+            carreras_pagadas =  pagos_confirmados + pagos_guardados
+            if carreras_pagadas < carrera.ronda:
+                penalizacion = penalizacion - 5
         lista_quiniela = historico_quiniela.quiniela_lista.split(",")
+        numero_piloto = ''
         for idx, codigo in enumerate(lista_quiniela):
-            piloto = sesion.query(Piloto).filter(Piloto.codigo == codigo).first()
-            numero_piloto = str(piloto.numero)
+            #piloto = sesion.query(Piloto).filter(Piloto.codigo == codigo).first()
+            for piloto in pilotos:
+                if piloto.codigo == codigo:
+                    numero_piloto = str(piloto.numero)
             if numero_piloto in posiciones_dict:
                 normales = normales + posiciones_dict[numero_piloto]["puntos"]
                 if idx + 1 == posiciones_dict[numero_piloto]['posicion']:
@@ -80,8 +95,8 @@ def archivar_puntos_participante(sesion, carrera:Carrera, posiciones_dict):
         restulados_carrera.append(Resultado(usuario_id=historico_quiniela.usuario_id, carrera_id=carrera.id, puntos_normales=normales, puntos_extras=extras, penalizaciones=penalizacion))
     sesion.add_all(restulados_carrera)
     sesion.flush()
-    
-def crear_tabla_puntos(sesion, carrera:Carrera):
+
+def crear_tabla_puntos(sesion, carrera):
     tabla_puntos_piloto = PrettyTable()
     tabla_puntos_piloto.title = carrera.nombre
     tabla_puntos_piloto.field_names = ["Pos", "Nombre", "Equipo", "Puntos", "Intervalo"]
@@ -175,7 +190,9 @@ def plotBarHorizontal(results, category_names):
 
     return fig, ax
 
-def crear_tabla_general(sesion):
+def crear_tabla_general(sesion, bot_nombre):
+    Usuario = INFORMACION_BOTS[bot_nombre]['tablas']['usuario']
+    Carrera = INFORMACION_BOTS[bot_nombre]['tablas']['carrera']
     tablaresultados = PrettyTable()
     tablaresultados.title = 'Tabla General Quiniela F1'
     tablaresultados.field_names = ["Nombre", "Puntos Totales", "Puntos Pilotos", "Puntos Extras", "Penalizaciones"]
@@ -206,7 +223,8 @@ def crear_tabla_general(sesion):
         dibujo.text((20, tablaresultados_tamano[3] + 20), "Total de rondas incluidas: " + str(total_rondas), font=letraabajo, fill="black")
     return im, total_rondas
 
-def crear_tabla_resultados(sesion, carrera:Carrera|None):
+def crear_tabla_resultados(sesion, carrera, bot_nombre):
+    Carrera = INFORMACION_BOTS[bot_nombre]['tablas']['carrera']
     carreras_archivadas = []
     im = Image.new("RGB", (200, 200), "white")
     texto_ganador = 'No hay carreras archivadas.'
@@ -260,7 +278,8 @@ def crear_tabla_resultados(sesion, carrera:Carrera|None):
     dibujo.text((20, tablaresultados_tamano[3] + 20), "Los que tienen penalizaciones no pueden ganar el premio, estan en la segunda seccion de la tabla", font=letraabajo, fill="black")
     return im, texto_ganador
 
-def detalle_individual_historico(sesion, telegram_id):
+def detalle_individual_historico(sesion, telegram_id, bot_nombre):
+    Usuario = INFORMACION_BOTS[bot_nombre]['tablas']['usuario']
     usuario = sesion.query(Usuario).filter(Usuario.telegram_id == telegram_id).first()
     mis_resultados = usuario.resultados
     im = Image.new("RGB", (200, 200), "white")
@@ -289,7 +308,10 @@ def detalle_individual_historico(sesion, telegram_id):
         dibujo.text((20, tabladetalletamano[3] + 20), texto_abajo, font=letra, fill="black")
     return im, texto_mensaje
 
-def detalle_individual_puntos(sesion, telegram_id):
+def detalle_individual_puntos(sesion, telegram_id, bot_nombre):
+    Usuario = INFORMACION_BOTS[bot_nombre]['tablas']['usuario']
+    HistoricoQuiniela = INFORMACION_BOTS[bot_nombre]['tablas']['historicoquiniela']
+    PuntosPilotosCarrera = INFORMACION_BOTS[bot_nombre]['tablas']['puntospilotocarrera']
     usuario = None
     ultimo_resultado = None
     ultima_quiniela = None
@@ -298,7 +320,7 @@ def detalle_individual_puntos(sesion, telegram_id):
     usuario.resultados.sort(key=lambda x: x.carrera.hora_empiezo, reverse = True)
     ultimo_resultado = usuario.resultados[0]
     ultima_quiniela = sesion.query(HistoricoQuiniela).filter(HistoricoQuiniela.usuario_id == usuario.id, HistoricoQuiniela.carrera_id == ultimo_resultado.carrera_id).first()
-    resultado_pilotos = sesion.query(PuntosPilotosCarrrera).filter(PuntosPilotosCarrrera.carrera_id == ultimo_resultado.carrera_id).all()
+    resultado_pilotos = sesion.query(PuntosPilotosCarrera).filter(PuntosPilotosCarrera.carrera_id == ultimo_resultado.carrera_id).all()
     im = Image.new("RGB", (200, 200), "white")
     texto_mensaje = 'No hay carreras archivadas.'
     if len(usuario.resultados) > 0:
@@ -348,3 +370,54 @@ def pagos_usuario(usuario_pagos):
         if pago.estado == 'confirmado':
             pagos_confirmados += pago.carreras
     return pagos_guardados, pagos_confirmados
+
+def actualizar_basedatos_pilotos(sesion, tabla):
+    rows =[]
+    url = 'https://api.jolpi.ca/ergast/f1/2026/constructors/'
+    constructores_request = requests.get(url)
+    constructores_request_dict = constructores_request.json()
+    for index, constructor in enumerate(constructores_request_dict['MRData']['ConstructorTable']['Constructors']):
+        url = 'https://api.jolpi.ca/ergast/f1/2026/constructors/' + constructor['constructorId'] + '/drivers/'
+        pilotos_request = requests.get(url)
+        pilotos_request_dict = pilotos_request.json()
+        for index, piloto in enumerate(pilotos_request_dict['MRData']['DriverTable']['Drivers']):
+            if 'permanentNumber' in piloto.keys():
+                url_acumulados = 'https://api.jolpi.ca/ergast/f1/2026/drivers/' + piloto['driverId'] + '/driverstandings/'
+                puntos_acumulados_request = requests.get(url_acumulados)
+                puntos_acumulados_dict = puntos_acumulados_request.json()
+                puntos_acumulados = 0
+                if len(puntos_acumulados_dict['MRData']['StandingsTable']['StandingsLists']) > 0:
+                    puntos_acumulados = int(puntos_acumulados_dict['MRData']['StandingsTable']['StandingsLists'][0]['DriverStandings'][0]['points'])
+                rows.append({"numero": int(piloto["permanentNumber"]), "nombre": piloto["givenName"], "apellido": piloto["familyName"], "codigo": piloto["code"], "equipo":constructor["name"], "acumulado_puntos": puntos_acumulados })
+    with sesion() as s:
+        upsert_many(s, tabla, rows)
+        s.commit()
+
+
+def upsert_many(session, model, rows, key_field="numero"):
+    if not rows:
+        return
+
+    key_col = getattr(model, key_field)
+
+    keys = [row[key_field] for row in rows]
+
+    existing = session.execute(
+        select(model).where(key_col.in_(keys))
+    ).scalars().all()
+
+    existing_map = {
+        getattr(obj, key_field): obj
+        for obj in existing
+    }
+
+    for row in rows:
+        obj = existing_map.get(row[key_field])
+
+        if obj:
+            # update existing
+            for k, v in row.items():
+                setattr(obj, k, v)
+        else:
+            # insert new
+            session.add(model(**row))

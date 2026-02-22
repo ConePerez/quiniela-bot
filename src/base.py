@@ -2,21 +2,25 @@
 from sqlalchemy import URL, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
+from environment import DB_HOST, DB_HOST_TEST, DB_PASSWORD, DB_USER, DEBUG_MODE, INFORMACION_BOTS
 
-db_user = os.environ.get("DB_USER")
-db_password = os.environ.get("DB_PASSWORD")
-db_host = os.environ.get("DB_HOST")
+db_user = DB_USER
+db_password = DB_PASSWORD
+db_host = ''
 
-connection_string = URL.create(
-    'postgresql',
-    username = db_user,
-    password= db_password,
-    host=db_host,
-    database='quinielaF1',
-)
+if DEBUG_MODE == "ON":
+    db_host = DB_HOST_TEST
+else :
+    db_host = DB_HOST
 
-engine = create_engine(connection_string, pool_pre_ping=True)
-# Session = sessionmaker(bind=engine, expire_on_commit=False)
-Session = sessionmaker(bind=engine)
-# Base = declarative_base()
+for mi_bot in INFORMACION_BOTS.values():
+    connection_string = URL.create(
+        'postgresql',
+        username = db_user,
+        password= db_password,
+        host= db_host,
+        database=mi_bot["basededatos"],
+    )
+    mi_bot["engine"] = create_engine(connection_string, pool_pre_ping=True)
+    mi_bot["sesion"] = sessionmaker(bind=mi_bot['engine'])
+    
