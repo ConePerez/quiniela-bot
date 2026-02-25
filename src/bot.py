@@ -187,8 +187,10 @@ async def apagar_todos_bots():
 async def set_hooks(url):
     """Configurar los bots"""
     for name, mi_bot in INFORMACION_BOTS.items():
-
-        await bot_apps[name].bot.set_webhook(url + "/webhook/" + name)
+        webhook_dir = 'webhook/'
+        if DEBUG_MODE == 'ON':
+            webhook_dir = '/webhook/'
+        await bot_apps[name].bot.set_webhook(url + webhook_dir + name)
         logger.info(bot_apps[name].bot.id)
         
 async def   procesar_actualizacion_bot(bot_name: str, data: dict):
