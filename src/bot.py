@@ -6,7 +6,7 @@ from telegram import (
     BotCommand,
     BotCommandScopeAllPrivateChats,
     BotCommandScopeAllGroupChats,
-
+    BotCommandScopeChat,
 )
 from telegram.ext import (
     Application,
@@ -61,6 +61,20 @@ async def iniciar_todos_bots():
                 ], 
                 scope=BotCommandScopeAllGroupChats()
             )
+            await app.bot.set_my_commands(
+                [
+                    BotCommand("start", "empezar el bot"),
+                    BotCommand("quiniela", "llenar la quiniela"),
+                    BotCommand("mipago", "mandar comprobante pago"),
+                    BotCommand("revisarpagos", "revisar pagos pendientes"),
+                    BotCommand("help", "mostrar reglas quiniela"),
+                    BotCommand("cancelar", "cancelar una accion"),
+                    BotCommand("mispuntos", "detalle puntos ultima carrera"),
+                    BotCommand("mihistorico", "puntos por carrera"),
+                    BotCommand("misaldo", "saber cuantas carreras pagadas tengo"),
+                ],
+                scope=BotCommandScopeChat(mi_bot['tesorero'])
+            )
             conversacion_bot = ConversationHandler(
                 entry_points=[
                     CommandHandler("quiniela", inicio_pilotos), 
@@ -103,7 +117,7 @@ async def iniciar_todos_bots():
             HORA_ACTUALIZAR = time(hour=14, minute=0, second=0)
             DIAS_SEMANA = (1,2,3)
             if DEBUG_MODE == 'ON':
-                HORA_ACTUALIZAR = time(hour=4, minute=45, second=0)
+                HORA_ACTUALIZAR = time(hour=4, minute=31, second=0)
                 DIAS_SEMANA = (1,2,3,4,5,6)
             hora_actual = datetime.now()
             hora_actual = hora_actual.astimezone()
@@ -151,7 +165,7 @@ async def iniciar_todos_bots():
             HORA_ACTUALIZAR = time(hour=14, minute=0, second=0)
             DIAS_SEMANA = (1,2,3)
             if DEBUG_MODE == 'ON':
-                HORA_ACTUALIZAR = time(hour=5, minute=2, second=0)
+                HORA_ACTUALIZAR = time(hour=4, minute=30, second=0)
                 DIAS_SEMANA = (1,2,3,4,5,6)
             hora_actual = datetime.now()
             hora_actual = hora_actual.astimezone()
