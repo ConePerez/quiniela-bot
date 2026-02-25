@@ -35,9 +35,9 @@ async def manejador_webhook(bot_name:str, request: Request):
     except ValueError as e:
         return {"error": str(e)}
 
-@app.get("/test")
+@app.post("/test")
 async def test():
-    return "esto es una prueba"
+    return Response(status_code=HTTPStatus.OK)
 
 @app.get("/actualizarpilotos")
 async def actualizarpilotos():
