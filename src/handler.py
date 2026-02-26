@@ -198,7 +198,7 @@ async def reglas(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def ayuda(update:Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    documento = INFORMACION_BOTS[context.bot_data['nombre']]['documentos']['reglas']
+    documento = INFORMACION_BOTS[context.bot_data['nombre']]['documentos']['ayuda']
     with open(documento, 'rb') as archivo_binario:
         contenido = archivo_binario.read()
         await query.edit_message_text(text="Ok, en un nuevo mensaje te envio el documento")
