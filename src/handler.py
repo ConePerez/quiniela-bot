@@ -37,7 +37,7 @@ async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         usuario = Usuario.obtener_usuario_por_telegram_id(telegram_id=telegram_usuario.id, session=sesion)
         pagos_guardados, pagos_confirmados = pagos_usuario(usuario_pagos=usuario.pagos)
         carreras = len(sesion.query(Carrera).all())
-    texto_mensaje = f'Hasta el momento tienes {pagos_guardados} pagadas ({pagos_confirmados} estan confirmados), para entrar a la /proxima carrera debes tener al menos {carreras} pagadas.'
+    texto_mensaje = f'Hasta el momento tienes {pagos_guardados + pagos_confirmados} pagadas ({pagos_confirmados} estan confirmados), para entrar a la /proxima carrera debes tener al menos {carreras} pagadas.'
     await update.message.reply_text(
         texto_mensaje, 
         reply_markup=ReplyKeyboardRemove()
@@ -105,7 +105,7 @@ async def pagos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         usuarios = sesion.query(Usuario).all()
         for usuario in usuarios:
             rondas_pagadas, rondas_confirmadas = pagos_usuario(usuario.pagos)
-            tablapagos.add_row([usuario.obtener_nombre_completo(), '24', str(rondas_pagadas), str(rondas_confirmadas)]) 
+            tablapagos.add_row([usuario.obtener_nombre_completo(), '24', str(rondas_pagadas + rondas_confirmadas), str(rondas_confirmadas)]) 
         im = Image.new("RGB", (200, 200), "white")
         dibujo = ImageDraw.Draw(im)
         letra = ImageFont.truetype("Menlo.ttc", 15)
