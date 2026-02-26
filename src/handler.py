@@ -28,7 +28,7 @@ MARKDOWN_SPECIAL_CHARS = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+',
 
 async def misaldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     Usuario = INFORMACION_BOTS[context.bot_data['nombre']]['tablas']['usuario']
-    Carrera = INFORMACION_BOTS[context.bot_data['nombre']]['tablas']['carrrera']
+    Carrera = INFORMACION_BOTS[context.bot_data['nombre']]['tablas']['carrera']
     telegram_usuario = update.message.from_user
     pagos_guardados = 0
     pagos_confirmados = 0
