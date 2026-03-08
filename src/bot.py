@@ -143,6 +143,8 @@ async def iniciar_todos_bots():
                     CommandHandler("quiniela", inicio_pilotos), 
                     CommandHandler("start", start),
                     CommandHandler("help", help),
+                    CommandHandler("general", general),
+                    CommandHandler("resultados", resultados),
                     CommandHandler("quinielas", quinielas),
                     CommandHandler("cancelar", cancelar),
                     CommandHandler("mispuntos", mandar_quinielas),
