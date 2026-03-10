@@ -184,7 +184,7 @@ async def agregar_qualy_carrera(context: ContextTypes.DEFAULT_TYPE):
     Carrera = INFORMACION_BOTS[context.bot_data['nombre']]['tablas']['carrera']
     fila_trabajos = INFORMACION_BOTS[context.bot_data['nombre']]['filatrabajos']
     delta_minutos = timedelta(minutes=0)
-    if INFORMACION_BOTS[context.bot_data['nombre']]['tipo'] == GRATIS
+    if INFORMACION_BOTS[context.bot_data['nombre']]['tipo'] == GRATIS:
         delta_minutos = timedelta(minutes=1)
     with INFORMACION_BOTS[context.bot_data['nombre']]['sesion']() as sesion:
         encurso_siguiente_Carrera = sesion.query(Carrera).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO')).first()
