@@ -9,7 +9,7 @@ from config import logger
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
-from environment import DEBUG_MODE, F1_API_KEY
+from environment import DEBUG_MODE, F1_API_KEY, GRATIS
 from sqlalchemy import or_
 
 async def enviar_pagos(context: ContextTypes.DEFAULT_TYPE):
@@ -183,6 +183,9 @@ async def agregar_nueva_carrera(context: ContextTypes.DEFAULT_TYPE):
 async def agregar_qualy_carrera(context: ContextTypes.DEFAULT_TYPE):
     Carrera = INFORMACION_BOTS[context.bot_data['nombre']]['tablas']['carrera']
     fila_trabajos = INFORMACION_BOTS[context.bot_data['nombre']]['filatrabajos']
+    delta_minutos = timedelta(minutes=0)
+    if INFORMACION_BOTS[context.bot_data['nombre']]['tipo'] == GRATIS
+        delta_minutos = timedelta(minutes=1)
     with INFORMACION_BOTS[context.bot_data['nombre']]['sesion']() as sesion:
         encurso_siguiente_Carrera = sesion.query(Carrera).filter((Carrera.estado == 'IDLE') | (Carrera.estado == 'EN-CURSO')).first()
         if encurso_siguiente_Carrera:
@@ -192,7 +195,7 @@ async def agregar_qualy_carrera(context: ContextTypes.DEFAULT_TYPE):
                     sesion_qualy = sesion_carrera
             trabajos = fila_trabajos.jobs()
             if len(trabajos) <= 2:
-                orden_trabajo_qualy = fila_trabajos.run_once( callback=mandar_quinielas, when=sesion_qualy.hora_empiezo, name="mandar_quinielas")
+                orden_trabajo_qualy = fila_trabajos.run_once( callback=mandar_quinielas, when=sesion_qualy.hora_empiezo + delta_minutos, name="mandar_quinielas")
                 orden_trabajo_carrera = fila_trabajos.run_repeating(callback=mandar_resultados, interval=300, first=encurso_siguiente_Carrera.hora_termino, last=encurso_siguiente_Carrera.hora_termino + timedelta(hours=2), name="mandar_resultados")
                 logger.info('qualy: ' + str(orden_trabajo_qualy.next_t))
                 logger.info('carrera: ' + str(orden_trabajo_carrera.next_t))
