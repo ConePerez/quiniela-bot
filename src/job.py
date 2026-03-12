@@ -71,15 +71,10 @@ async def mandar_resultados(context: ContextTypes.DEFAULT_TYPE):
             response = s.get(url=urlevent_tracker, headers=headerapi)
             response.encoding = 'utf-8-sig'
             response_dict = response.json()
-            links = []
-            if('links' in response_dict):
-                links = response_dict['links']
-                if DEBUG_MODE == 'ON':
-                    links = [{"text":"RESULTS", "url":"https://www.formula1.com/en/results/2025/races/1254/australia/race-result"}]                                
-                url_results_index = next((index for (index, d) in enumerate(links) if d["text"] == "RESULTS"), None)
-                logger.info(url_results_index)
-                if(not(url_results_index is None)):
-                    url_results = links[url_results_index]['url'] 
+            if('sessionResults' in response_dict):
+                url_results = response_dict['sessionResults']['resultsPageUrl']
+                if(not(url_results is None)):
+                    url_results = 'https://www.formula1.com' + url_results 
                     response = s.get(url_results)
                     if DEBUG_MODE == 'ON':
                         response = s.get("https://www.formula1.com/en/results/2025/races/1254/australia/race-result")
@@ -132,7 +127,9 @@ async def agregar_nueva_carrera(context: ContextTypes.DEFAULT_TYPE):
     Carrera = INFORMACION_BOTS[context.bot_data['nombre']]['tablas']['carrera']
     SesionCarrera = INFORMACION_BOTS[context.bot_data['nombre']]['tablas']['sesioncarrera']
     fila_trabajos = INFORMACION_BOTS[context.bot_data['nombre']]['filatrabajos']
-
+    delta_minutos = timedelta(minutes=0)
+    if INFORMACION_BOTS[context.bot_data['nombre']]['tipo'] == GRATIS:
+        delta_minutos = timedelta(minutes=1)
     with INFORMACION_BOTS[context.bot_data['nombre']]['sesion']() as sesion:
         urlevent_tracker = 'https://api.formula1.com/v1/event-tracker' 
         headerapi = {'apikey':F1_API_KEY, 'locale':'en'}
@@ -174,8 +171,8 @@ async def agregar_nueva_carrera(context: ContextTypes.DEFAULT_TYPE):
                 if es_valida:
                     sesion.add_all(nuevas_sesiones)
                     sesion.commit()
-                    orden_trabajo_qualy = fila_trabajos.run_once( callback=mandar_quinielas, when=hora_qualy, name="mandar_quinielas")
-                    orden_trabajo_carrera = fila_trabajos.run_repeating(callback=mandar_resultados, interval=300, first=hora_termino_carrera, last=hora_termino_carrera + timedelta(hours=2), name="mandar_resultados")
+                    orden_trabajo_qualy = fila_trabajos.run_once( callback=mandar_quinielas, when=hora_qualy + delta_minutos, name="mandar_quinielas")
+                    orden_trabajo_carrera = fila_trabajos.run_repeating(callback=mandar_resultados, interval=300, first=hora_termino_carrera + delta_minutos, last=hora_termino_carrera + timedelta(hours=2), name="mandar_resultados")
                     logger.info('qualy: ' + str(orden_trabajo_qualy.next_t))
                     logger.info('carrera: ' + str(orden_trabajo_carrera.next_t))
                     logger.info('carrera fin: ' + str(hora_termino_carrera + timedelta(hours=2)))
@@ -196,6 +193,6 @@ async def agregar_qualy_carrera(context: ContextTypes.DEFAULT_TYPE):
             trabajos = fila_trabajos.jobs()
             if len(trabajos) <= 2:
                 orden_trabajo_qualy = fila_trabajos.run_once( callback=mandar_quinielas, when=sesion_qualy.hora_empiezo + delta_minutos, name="mandar_quinielas")
-                orden_trabajo_carrera = fila_trabajos.run_repeating(callback=mandar_resultados, interval=300, first=encurso_siguiente_Carrera.hora_termino, last=encurso_siguiente_Carrera.hora_termino + timedelta(hours=2), name="mandar_resultados")
+                orden_trabajo_carrera = fila_trabajos.run_repeating(callback=mandar_resultados, interval=300, first=encurso_siguiente_Carrera.hora_termino + delta_minutos, last=encurso_siguiente_Carrera.hora_termino + timedelta(hours=2), name="mandar_resultados")
                 logger.info('qualy: ' + str(orden_trabajo_qualy.next_t))
                 logger.info('carrera: ' + str(orden_trabajo_carrera.next_t))
