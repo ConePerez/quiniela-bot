@@ -147,8 +147,8 @@ async def iniciar_todos_bots():
                     CommandHandler("resultados", resultados),
                     CommandHandler("quinielas", quinielas),
                     CommandHandler("cancelar", cancelar),
-                    CommandHandler("mispuntos", mandar_quinielas),
-                    CommandHandler("mihistorico", mandar_resultados),
+                    CommandHandler("mispuntos", mispuntos),
+                    CommandHandler("mihistorico", mihistorico),
                     ],
                 states={
                     P1:[CallbackQueryHandler(p1, pattern=filtropilotos)],
