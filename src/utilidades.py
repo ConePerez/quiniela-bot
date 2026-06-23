@@ -5,7 +5,7 @@ from operator import itemgetter
 import numpy as np
 import matplotlib.pyplot as plt
 from base import INFORMACION_BOTS
-from environment import DEPAGO
+from environment import DEPAGO, GRATIS
 from config import logger
 import requests
 from sqlalchemy import select
@@ -262,7 +262,7 @@ def crear_tabla_resultados(sesion, carrera, bot_nombre):
             linea = True
         else:
             tablaresultados.add_row(resultado)
-    if puntos_ganador >= 90:
+    if (puntos_ganador >= 90 and INFORMACION_BOTS[bot_nombre]['tipo'] == DEPAGO) or INFORMACION_BOTS[bot_nombre]['tipo'] == GRATIS:
         texto_ganador = texto_ganador + ganador + '. Con un total de ' + str(puntos_ganador) + ' puntos.'
     else:
         texto_ganador = 'No hubo ganador para la carrera: ' + carrera.nombre + '. Nadie logro hacer 90 puntos o mas. El premio se acumula para la /proxima carrera.'
